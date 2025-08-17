@@ -19,7 +19,7 @@ if DATABASE_URL:
         DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql+psycopg2://", 1)
     app.config["SQLALCHEMY_DATABASE_URI"] = DATABASE_URL
 else:
-    app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///app.db"
+    app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:////data/app.db"
 
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 db = SQLAlchemy(app)
