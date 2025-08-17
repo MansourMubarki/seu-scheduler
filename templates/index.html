@@ -1,17 +1,11 @@
-
 {% extends "base.html" %}
 {% block content %}
-<div class="row align-items-center g-4">
-  <div class="col-md-6">
-    <h1 class="fw-bold mb-3">منظّم الجداول لطلاب <span class="seu-gradient">الجامعة السعودية الإلكترونية</span></h1>
-    <p class="lead">سجّل دخولك وأنشئ جدولك الأسبوعي مع مواعيد الاختبارات، ثم نزّل الجدول كصورة PNG أو PDF جاهز للمشاركة.</p>
-    <div class="d-flex gap-2">
-      <a class="btn btn-primary btn-lg" href="{{ url_for('register') }}">تسجيل جديد</a>
-      <a class="btn btn-outline-secondary btn-lg" href="{{ url_for('login') }}">تسجيل الدخول</a>
+  <section class="hero">
+    <h1>منظّم جداول الجامعة</h1>
+    <p>أضف محاضراتك واختباراتك وشاهد الإحصائيات بنقرة زر.</p>
+    <div class="actions">
+      <a class="btn btn-primary" href="{{ url_for('register') }}">إنشاء حساب</a>
+      <a class="btn" href="{{ url_for('login') }}">تسجيل الدخول</a>
     </div>
-  </div>
-  <div class="col-md-6 text-center">
-    <img src="{{ url_for('static', filename='img/seu-logo.png') }}" class="img-fluid" style="max-height:240px" alt="SEU Logo">
-  </div>
-</div>
+  </section>
 {% endblock %}

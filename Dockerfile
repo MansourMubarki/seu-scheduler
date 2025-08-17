@@ -1,5 +1,4 @@
-
-# Fly.io Dockerfile for Flask
+# Simple, reliable image
 FROM python:3.11-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -7,16 +6,13 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
-    && rm -rf /var/lib/apt/lists/*
-
-COPY requirements.txt .
+COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
+# Fly will provide PORT, default to 8080
 ENV PORT=8080
-EXPOSE 8080
 
+# Using Flask's built-in server for simplicity; you can switch to gunicorn later
 CMD ["python", "app.py"]
