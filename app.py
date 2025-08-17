@@ -19,7 +19,7 @@ if DATABASE_URL:
         DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql+psycopg2://", 1)
     app.config["SQLALCHEMY_DATABASE_URI"] = DATABASE_URL
 else:
-    app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:////data/app.db"
+    app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///app.db"
 
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 db = SQLAlchemy(app)
@@ -131,25 +131,41 @@ def dashboard():
     user = current_user()
     courses = Course.query.filter_by(user_id=user.id).all()
     exams = Exam.query.filter_by(user_id=user.id).all()
-# --- إحصائيات المستخدم ---
-def _to_minutes(t):
-    try:
-        h, m = map(int, t.split(":"))
-        return h*60 + m
-    except Exception:
-        return 0
 
-lec_count = len(courses)
-onsite_count = sum(1 for c in courses if c.mode == "حضوري")
-online_count = lec_count - onsite_count
-total_minutes = sum(max(0, _to_minutes(c.end) - _to_minutes(c.start)) for c in courses)
-total_hours = round(total_minutes / 60, 2)
+    # --- إحصائيات المستخدم ---
+    def _to_minutes(t):
+        try:
+            h, m = map(int, str(t).split(":"))
+            return h*60 + m
+        except Exception:
+            return 0
 
-exam_count = len(exams)
-mid_count = sum(1 for e in exams if e.kind == "ميد")
-final_count = sum(1 for e in exams if e.kind == "فاينل")
+    lec_count = len(courses)
+    onsite_keywords = {"حضوري", "onsite", "inperson", "presence"}
+    online_keywords = {"عن بعد", "اونلاين", "online", "remote"}
+    onsite_count = sum(1 for c in courses if str(c.mode).strip() in onsite_keywords)
+    online_count = sum(1 for c in courses if str(c.mode).strip() in online_keywords)
 
-    return render_template("dashboard.html", user=user, courses=courses, exams=exams, lec_count=lec_count, onsite_count=onsite_count, online_count=online_count, total_hours=total_hours, exam_count=exam_count, mid_count=mid_count, final_count=final_count)
+    total_minutes = sum(max(0, _to_minutes(getattr(c, "end", "0:00")) - _to_minutes(getattr(c, "start", "0:00"))) for c in courses)
+    total_hours = round(total_minutes/60, 2)
+
+    exam_count = len(exams)
+    mid_count = sum(1 for e in exams if getattr(e, "kind", "") == "ميد")
+    final_count = sum(1 for e in exams if getattr(e, "kind", "") == "فاينل")
+
+    return render_template(
+        "dashboard.html",
+        user=user,
+        courses=courses,
+        exams=exams,
+        lec_count=lec_count,
+        onsite_count=onsite_count,
+        online_count=online_count,
+        total_hours=total_hours,
+        exam_count=exam_count,
+        mid_count=mid_count,
+        final_count=final_count,
+    )
 
 @app.route("/course", methods=["POST"])
 @login_required
