@@ -1,11 +1,11 @@
 {% extends "base.html" %}
 {% block content %}
   <section class="hero">
-    <h1>منظّم جداول الجامعة</h1>
-    <p>أضف محاضراتك واختباراتك وشاهد الإحصائيات بنقرة زر.</p>
-    <div class="actions">
-      <a class="btn btn-primary" href="{{ url_for('register') }}">إنشاء حساب</a>
-      <a class="btn" href="{{ url_for('login') }}">تسجيل الدخول</a>
+    <h1 style="margin:0 0 8px 0">مرحباً بك في SEU Scheduler</h1>
+    <p style="margin:0">منصة بسيطة لإدارة محاضراتك واختباراتك في <strong>الجامعة السعودية الإلكترونية</strong> مع عرض إحصائيات ورسوم بيانية، وتصدير جدول منسق للطباعة.</p>
+    <p style="margin-top:8px;color:#334">فكرة وتنفيذ المدرب منصور مباركي — تمت البرمجة بمساعدة ChatGPT • © 2025</p>
+    <div style="margin-top:12px">
+      <a class="btn" href="{{ url_for('register') }}">ابدأ الآن</a>
     </div>
   </section>
 {% endblock %}

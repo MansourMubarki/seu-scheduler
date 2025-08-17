@@ -1,54 +1,31 @@
 {% extends "base.html" %}
 {% block content %}
-  <div class="dash-header">
-    <h2>لوحة المشرف</h2>
-    <div class="dash-actions">
-      <form method="post" action="{{ url_for('clear_all_data') }}" onsubmit="return confirm('مسح كل البيانات؟');">
-        <button class="btn btn-danger">مسح كل المحاضرات والاختبارات</button>
-      </form>
-    </div>
-  </div>
+<div class="card">
+  <h2 style="margin-top:0">لوحة المشرف</h2>
+  <p>المستخدمون: {{ user_count }} | المشرفون: {{ admin_count }} | المحاضرات: {{ course_count }} | الاختبارات: {{ exam_count }}</p>
 
-  <section class="card">
-    <h3>المستخدمون</h3>
-    <div class="table-wrapper">
-      <table>
-        <thead>
-          <tr>
-            <th>#</th>
-            <th>الاسم</th>
-            <th>البريد</th>
-            <th>مشرف؟</th>
-            <th>إجراءات</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for u in users %}
-          <tr>
-            <td>{{ u.id }}</td>
-            <td>{{ u.name }}</td>
-            <td>{{ u.email }}</td>
-            <td>
-              {% if u.is_admin %}
-                <span class="badge admin">مشرف</span>
-              {% else %}
-                <span class="badge">مستخدم</span>
-              {% endif %}
-            </td>
-            <td class="row-actions">
-              {% if not u.is_admin %}
-              <form method="post" action="{{ url_for('make_admin', uid=u.id) }}"><button class="btn btn-primary">ترقية لمشرف</button></form>
-              {% else %}
-              <form method="post" action="{{ url_for('remove_admin', uid=u.id) }}"><button class="btn btn-warning">إزالة مشرف</button></form>
-              {% endif %}
-              <form method="post" action="{{ url_for('delete_user_admin', uid=u.id) }}" onsubmit="return confirm('حذف المستخدم وكل بياناته؟');">
-                <button class="btn btn-danger">حذف</button>
-              </form>
-            </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-  </section>
+  <table class="table">
+    <thead><tr><th>#</th><th>الاسم</th><th>البريد</th><th>مشرف؟</th><th class="no-print">إجراءات</th></tr></thead>
+    <tbody>
+      {% for u in users %}
+      <tr class="tr">
+        <td>{{ u.id }}</td>
+        <td>{{ u.name }}</td>
+        <td>{{ u.email }}</td>
+        <td>{{ 'نعم' if u.is_admin else 'لا' }}</td>
+        <td class="no-print" style="display:flex;gap:6px">
+          {% if not u.is_admin %}
+            <form method="post" action="{{ url_for('make_admin', uid=u.id) }}"><button class="btn btn-outline">ترقية</button></form>
+          {% else %}
+            <form method="post" action="{{ url_for('remove_admin', uid=u.id) }}"><button class="btn btn-outline">إزالة</button></form>
+          {% endif %}
+          <form method="post" action="{{ url_for('delete_user_admin', uid=u.id) }}" onsubmit="return confirm('حذف المستخدم وبياناته؟')"><button class="btn btn-outline">حذف</button></form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <form class="no-print" method="post" action="{{ url_for('clear_all_data') }}" onsubmit="return confirm('مسح كل المحاضرات والاختبارات؟')"><button class="btn">مسح كل البيانات</button></form>
+</div>
 {% endblock %}

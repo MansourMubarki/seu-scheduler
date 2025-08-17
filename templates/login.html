@@ -1,11 +1,22 @@
 {% extends "base.html" %}
 {% block content %}
-  <h2>تسجيل الدخول</h2>
-  <form method="post" class="form-grid">
-    <label>البريد</label>
-    <input type="email" name="email" required>
-    <label>كلمة المرور</label>
-    <input type="password" name="password" required>
-    <button class="btn btn-primary" type="submit">دخول</button>
-  </form>
+<div class="grid grid-2">
+  <div class="card">
+    <h2>تسجيل الدخول</h2>
+    <form method="post">
+      <div class="field">
+        <label>البريد الإلكتروني</label>
+        <input name="email" type="email" required>
+      </div>
+      <div class="field">
+        <label>كلمة المرور</label>
+        <input name="password" type="password" required>
+      </div>
+      <button class="btn">دخول</button>
+    </form>
+  </div>
+  <div class="card">
+    ليس لديك حساب؟ <a href="{{ url_for('register') }}">سجّل الآن</a>
+  </div>
+</div>
 {% endblock %}

@@ -1,13 +1,23 @@
 {% extends "base.html" %}
 {% block content %}
-  <h2>تسجيل حساب</h2>
-  <form method="post" class="form-grid">
-    <label>الاسم</label>
-    <input type="text" name="name" required>
-    <label>البريد</label>
-    <input type="email" name="email" required>
-    <label>كلمة المرور</label>
-    <input type="password" name="password" required>
-    <button class="btn btn-primary" type="submit">تسجيل</button>
+<div class="card">
+  <h2>إنشاء حساب</h2>
+  <form method="post">
+    <div class="grid grid-2">
+      <div class="field">
+        <label>الاسم</label>
+        <input name="name" required>
+      </div>
+      <div class="field">
+        <label>البريد الإلكتروني</label>
+        <input name="email" type="email" required>
+      </div>
+      <div class="field">
+        <label>كلمة المرور</label>
+        <input name="password" type="password" required>
+      </div>
+    </div>
+    <button class="btn">تسجيل</button>
   </form>
+</div>
 {% endblock %}

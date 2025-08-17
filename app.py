@@ -1,45 +1,43 @@
+\
 import os
-import sqlite3
 from datetime import datetime
-from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify, send_file
+from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
 from functools import wraps
-from io import StringIO
-import csv
+from sqlalchemy import inspect, text
 
 # ============== Config ==============
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
-DEFAULT_SQLITE = "sqlite:////data/app.db"  # persist on Fly volume
+DB_PATH = os.path.join("/data", "app.db")  # use volume
+os.makedirs("/data", exist_ok=True)
+
 app = Flask(__name__, static_folder="static", template_folder="templates")
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "change-me-in-prod")
-
-DATABASE_URL = os.environ.get("DATABASE_URL", "").strip()
+DATABASE_URL = os.environ.get("DATABASE_URL", "")
 if DATABASE_URL:
     if DATABASE_URL.startswith("postgres://"):
         DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql+psycopg2://", 1)
     app.config["SQLALCHEMY_DATABASE_URI"] = DATABASE_URL
 else:
-    app.config["SQLALCHEMY_DATABASE_URI"] = DEFAULT_SQLITE
+    app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///" + DB_PATH
 
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 db = SQLAlchemy(app)
 
 # ============== Models ==============
 class User(db.Model):
-    __tablename__ = "user"
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(120))
     email = db.Column(db.String(120), unique=True, nullable=False)
     password_hash = db.Column(db.String(255), nullable=False)
-    # NEW: admin flag
     is_admin = db.Column(db.Boolean, default=False, nullable=False)
 
 class Course(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     title = db.Column(db.String(200), nullable=False)
-    day = db.Column(db.String(20), nullable=False)  # Sunday..Saturday or Arabic names
+    day = db.Column(db.String(20), nullable=False)  # 'الأحد'..'السبت'
     start = db.Column(db.String(5), nullable=False) # "16:00"
     end = db.Column(db.String(5), nullable=False)   # "16:50"
     mode = db.Column(db.String(20), default="حضوري")  # حضوري / عن بعد
@@ -49,9 +47,28 @@ class Exam(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     title = db.Column(db.String(200), nullable=False)
     kind = db.Column(db.String(20), nullable=False)  # ميد / فاينل
-    date = db.Column(db.String(10), nullable=False)  # YYYY-MM-DD
+    date = db.Column(db.String(10), nullable=False)  # 2025-08-20
     start = db.Column(db.String(5), nullable=False)
     end = db.Column(db.String(5), nullable=False)
+
+# ============== DB bootstrap / migration helpers ==============
+def ensure_schema():
+    db.create_all()
+    # add is_admin to existing SQLite dbs if missing
+    inspector = inspect(db.engine)
+    cols = [c['name'] for c in inspector.get_columns('user')]
+    if 'is_admin' not in cols:
+        with db.engine.begin() as conn:
+            conn.execute(text("ALTER TABLE user ADD COLUMN is_admin BOOLEAN DEFAULT 0"))
+    db.session.commit()
+
+def first_user_admin():
+    # ensure there is at least one admin
+    if User.query.count() >= 1 and User.query.filter_by(is_admin=True).count() == 0:
+        u = User.query.order_by(User.id.asc()).first()
+        if u:
+            u.is_admin = True
+            db.session.commit()
 
 # ============== Helpers ==============
 def login_required(f):
@@ -78,33 +95,31 @@ def current_user():
         return None
     return User.query.get(uid)
 
-def _to_minutes(t):
+# ============== Jinja filters ==============
+def to12(t):
     try:
         h, m = map(int, str(t).split(":"))
-        return h*60 + m
+        dt = datetime(2000, 1, 1, h, m)
+        return dt.strftime("%I:%M %p").lstrip("0").replace("AM", "ص").replace("PM", "م")
     except Exception:
-        return 0
+        return t
 
-# Ensure column exists for SQLite (simple migration)
-def _ensure_is_admin_column():
-    uri = app.config["SQLALCHEMY_DATABASE_URI"]
-    if uri.startswith("sqlite"):
-        # get file path after sqlite:///
-        path = uri.split("sqlite:///", 1)[1]
-        try:
-            con = sqlite3.connect(path)
-            cur = con.cursor()
-            cur.execute("PRAGMA table_info(user)")
-            cols = [r[1] for r in cur.fetchall()]
-            if "is_admin" not in cols:
-                cur.execute("ALTER TABLE user ADD COLUMN is_admin INTEGER NOT NULL DEFAULT 0")
-                con.commit()
-            con.close()
-        except Exception as e:
-            # table might not exist yet
-            pass
+def date_ar(d):
+    try:
+        dt = datetime.strptime(d, "%Y-%m-%d")
+        months = ["يناير","فبراير","مارس","أبريل","مايو","يونيو","يوليو","أغسطس","سبتمبر","أكتوبر","نوفمبر","ديسمبر"]
+        return f"{dt.day} {months[dt.month-1]} {dt.year}"
+    except Exception:
+        return d
+
+app.jinja_env.filters['to12'] = to12
+app.jinja_env.filters['date_ar'] = date_ar
 
 # ============== Routes ==============
+@app.route("/health")
+def health():
+    return "ok", 200
+
 @app.route("/")
 def index():
     if "user_id" in session:
@@ -123,10 +138,10 @@ def register():
         if User.query.filter_by(email=email).first():
             flash("البريد مستخدم مسبقًا", "danger")
             return redirect(url_for("register"))
-        is_first_user = (User.query.count() == 0)
-        user = User(name=name, email=email, password_hash=generate_password_hash(password), is_admin=is_first_user)
+        user = User(name=name, email=email, password_hash=generate_password_hash(password))
         db.session.add(user)
         db.session.commit()
+        first_user_admin()
         flash("تم التسجيل بنجاح! سجل الدخول الآن.", "success")
         return redirect(url_for("login"))
     return render_template("register.html")
@@ -151,18 +166,6 @@ def logout():
     flash("تم تسجيل الخروج", "info")
     return redirect(url_for("index"))
 
-def _arabic_day_to_en(d):
-    mapping = {
-        "الأحد":"Sunday","الاحد":"Sunday","أحد":"Sunday",
-        "الاثنين":"Monday","الإثنين":"Monday","اثنين":"Monday",
-        "الثلاثاء":"Tuesday","ثلاثاء":"Tuesday",
-        "الأربعاء":"Wednesday","اربعاء":"Wednesday",
-        "الخميس":"Thursday",
-        "الجمعة":"Friday",
-        "السبت":"Saturday"
-    }
-    return mapping.get((d or "").strip(), d)
-
 @app.route("/dashboard")
 @login_required
 def dashboard():
@@ -170,34 +173,34 @@ def dashboard():
     courses = Course.query.filter_by(user_id=user.id).all()
     exams = Exam.query.filter_by(user_id=user.id).all()
 
+    # --- stats ---
+    def _to_minutes(t):
+        try:
+            h, m = map(int, str(t).split(":"))
+            return h*60 + m
+        except Exception:
+            return 0
+
     lec_count = len(courses)
-    onsite_keywords = {"حضوري", "onsite", "inperson", "presence"}
-    online_keywords = {"عن بعد", "اونلاين", "online", "remote"}
-    onsite_count = sum(1 for c in courses if str(c.mode).strip() in onsite_keywords)
-    online_count = sum(1 for c in courses if str(c.mode).strip() in online_keywords)
+    onsite_count = sum(1 for c in courses if str(c.mode).strip() == "حضوري")
+    online_count = sum(1 for c in courses if str(c.mode).strip() == "عن بعد")
 
     total_minutes = sum(max(0, _to_minutes(getattr(c, "end", "0:00")) - _to_minutes(getattr(c, "start", "0:00"))) for c in courses)
     total_hours = round(total_minutes/60, 2)
 
     exam_count = len(exams)
-    mid_count = sum(1 for e in exams if getattr(e, "kind", "") in ["ميد", "mid", "Mid"])
-    final_count = sum(1 for e in exams if getattr(e, "kind", "") in ["فاينل", "final", "Final"])
+    mid_count = sum(1 for e in exams if getattr(e, "kind", "") == "ميد")
+    final_count = sum(1 for e in exams if getattr(e, "kind", "") == "فاينل")
 
-    # Normalize days for table sorting/grouping
-    day_order = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"]
-    def sort_key_course(c):
-        d = _arabic_day_to_en(c.day)
-        try:
-            di = day_order.index(d)
-        except ValueError:
-            di = 99
-        return (di, c.start)
-    courses_sorted = sorted(courses, key=sort_key_course)
+    # counts by day in Arabic order
+    days_ar = ['الأحد','الإثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت']
+    counts_by_day = [sum(1 for c in courses if c.day == d) for d in days_ar]
 
     return render_template(
         "dashboard.html",
+        title="لوحتي",
         user=user,
-        courses=courses_sorted,
+        courses=courses,
         exams=exams,
         lec_count=lec_count,
         onsite_count=onsite_count,
@@ -206,6 +209,8 @@ def dashboard():
         exam_count=exam_count,
         mid_count=mid_count,
         final_count=final_count,
+        days_ar=days_ar,
+        counts_by_day=counts_by_day,
     )
 
 @app.route("/course", methods=["POST"])
@@ -264,7 +269,19 @@ def delete_exam(eid):
     flash("تم حذف الاختبار.", "info")
     return redirect(url_for("dashboard"))
 
-# ========== Admin ==========
+# API for exporting data as JSON (optional)
+@app.route("/api/my-schedule")
+@login_required
+def api_schedule():
+    user = current_user()
+    courses = [{
+        "title": c.title, "day": c.day, "start": c.start, "end": c.end, "mode": c.mode
+    } for c in Course.query.filter_by(user_id=user.id)]
+    exams = [{
+        "title": e.title, "kind": e.kind, "date": e.date, "start": e.start, "end": e.end
+    } for e in Exam.query.filter_by(user_id=user.id)]
+    return jsonify({"courses": courses, "exams": exams})
+
 @app.route("/admin")
 @login_required
 @admin_required
@@ -318,90 +335,10 @@ def clear_all_data():
     flash("تم مسح كل المحاضرات والاختبارات.", "warning")
     return redirect(url_for('admin_dashboard'))
 
-# ========== Export ==========
-@app.route("/export/courses.csv")
-@login_required
-def export_courses_csv():
-    user = current_user()
-    courses = Course.query.filter_by(user_id=user.id).all()
-    si = StringIO()
-    writer = csv.writer(si)
-    writer.writerow(["Title","Day","Start","End","Mode"])
-    for c in courses:
-        writer.writerow([c.title, c.day, c.start, c.end, c.mode])
-    output = si.getvalue().encode("utf-8-sig")
-    return send_file(
-        io.BytesIO(output),
-        mimetype="text/csv; charset=utf-8",
-        as_attachment=True,
-        download_name="courses.csv"
-    )
-
-@app.route("/export/exams.csv")
-@login_required
-def export_exams_csv():
-    user = current_user()
-    exams = Exam.query.filter_by(user_id=user.id).all()
-    si = StringIO()
-    writer = csv.writer(si)
-    writer.writerow(["Title","Kind","Date","Start","End"])
-    for e in exams:
-        writer.writerow([e.title, e.kind, e.date, e.start, e.end])
-    output = si.getvalue().encode("utf-8-sig")
-    return send_file(
-        io.BytesIO(output),
-        mimetype="text/csv; charset=utf-8",
-        as_attachment=True,
-        download_name="exams.csv"
-    )
-
-# API for exporting data as JSON (optional, handy for integrations)
-@app.route("/api/my-schedule")
-@login_required
-def api_schedule():
-    user = current_user()
-    courses = [{
-        "title": c.title, "day": c.day, "start": c.start, "end": c.end, "mode": c.mode
-    } for c in Course.query.filter_by(user_id=user.id)]
-    exams = [{
-        "title": e.title, "kind": e.kind, "date": e.date, "start": e.start, "end": e.end
-    } for e in Exam.query.filter_by(user_id=user.id)]
-    return jsonify({"courses": courses, "exams": exams})
-
-
-# Health endpoint
-@app.route("/health", methods=["GET"])
-def health():
-    return "ok", 200
-
-# CLI commands
-@app.cli.command("init-db")
-def init_db():
-    db.create_all()
-    _ensure_is_admin_column()
-    # ensure first user is admin
-    first = User.query.order_by(User.id.asc()).first()
-    if first and not first.is_admin:
-        first.is_admin = True
-        db.session.commit()
-    print("Database initialized.")
-
-@app.cli.command("upgrade-db")
-def upgrade_db():
-    db.create_all()
-    _ensure_is_admin_column()
-    # if no admins exist, promote the first user
-    if User.query.filter_by(is_admin=True).count() == 0:
-        first = User.query.order_by(User.id.asc()).first()
-        if first:
-            first.is_admin = True
-            db.session.commit()
-    print("Database upgraded.")
+# Startup
+with app.app_context():
+    ensure_schema()
+    first_user_admin()
 
 if __name__ == "__main__":
-    # Ensure DB schema at start-up as well
-    with app.app_context():
-        db.create_all()
-        _ensure_is_admin_column()
-    port = int(os.environ.get("PORT", 8080))
-    app.run(host="0.0.0.0", port=port)
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 8080)))

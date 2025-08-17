@@ -1,8 +1,12 @@
+# Fly.io configuration
 app = "seu-scheduler"
 primary_region = "fra"
 
 [build]
   dockerfile = "Dockerfile"
+
+[env]
+  PORT = "8080"
 
 [http_service]
   internal_port = 8080
@@ -10,14 +14,13 @@ primary_region = "fra"
   auto_start_machines = true
   auto_stop_machines = "off"
   min_machines_running = 1
-  
-# احذف كتلة [[http_service.checks]] كاملة مؤقتًا
-[[http_service.checks]]
-grace_period = "10s"
-interval = "15s"
-method = "GET"
-path = "/health"
-timeout = "2s"
+
+  [[http_service.checks]]
+    grace_period = "10s"
+    interval = "15s"
+    method = "GET"
+    path = "/health"
+    timeout = "2s"
 
 [[mounts]]
   source = "data"

@@ -1,18 +1,22 @@
-# Simple, reliable image
 FROM python:3.11-slim
 
-ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1
+# Install system deps (for psycopg2-binary runtime libs)
+RUN apt-get update && apt-get install -y --no-install-recommends     libpq5 curl ca-certificates && rm -rf /var/lib/apt/lists/*
+
+ENV PYTHONDONTWRITEBYTECODE=1     PYTHONUNBUFFERED=1     PORT=8080     PIP_NO_CACHE_DIR=1
 
 WORKDIR /app
+COPY requirements.txt /app/
+RUN pip install -r requirements.txt
 
-COPY requirements.txt ./
-RUN pip install --no-cache-dir -r requirements.txt
+# Copy app
+COPY . /app
 
-COPY . .
+# Ensure data dir exists and is writable
+RUN mkdir -p /data && chmod 755 /data
 
-# Fly will provide PORT, default to 8080
-ENV PORT=8080
+# Healthcheck is served by /health route
+EXPOSE 8080
 
-# Using Flask's built-in server for simplicity; you can switch to gunicorn later
-CMD ["python", "app.py"]
+# Use gunicorn for production
+CMD ["gunicorn", "-w", "2", "-k", "gthread", "--threads", "4", "--timeout", "120", "-b", "0.0.0.0:8080", "wsgi:app"]
