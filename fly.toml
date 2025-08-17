@@ -1,20 +1,16 @@
-
-# Basic Fly configuration (edit app name after `fly launch`)
 app = "seu-scheduler"
+primary_region = "fra"
 
 [build]
   dockerfile = "Dockerfile"
 
-[env]
-  PORT = "8080"
-
-[[services]]
+[http_service]
   internal_port = 8080
-  processes = ["app"]
-  protocol = "tcp"
-  [[services.ports]]
-    handlers = ["http"]
-    port = 80
-  [[services.ports]]
-    handlers = ["tls", "http"]
-    port = 443
+  force_https = true
+  auto_start_machines = true
+  auto_stop_machines = "stop"
+  min_machines_running = 0
+
+[[mounts]]
+  source = "data"
+  destination = "/data"
