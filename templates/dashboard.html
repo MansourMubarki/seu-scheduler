@@ -1,9 +1,9 @@
+
 {% extends "base.html" %}
 {% block content %}
 <h3 class="mb-3">مرحبًا {{ user.name }} 👋</h3>
-<img src="{{ url_for('static', filename='img/seu-logo.png') }}" alt="SEU" style="height:36px">
+
 <div class="row g-4">
-  <!-- العمود الأيسر: النماذج -->
   <div class="col-lg-4">
     <div class="card shadow-sm">
       <div class="card-body">
@@ -17,7 +17,7 @@
             <label class="form-label">اليوم</label>
             <select required name="day" class="form-select">
               {% for d in ["الأحد","الاثنين","الثلاثاء","الأربعاء","الخميس","الجمعة","السبت"] %}
-                <option>{{ d }}</option>
+              <option>{{ d }}</option>
               {% endfor %}
             </select>
           </div>
@@ -31,7 +31,6 @@
               <input type="time" name="end" class="form-control" required>
             </div>
           </div>
-          <small class="text-muted d-block mt-1">* يُعرض في الجدول بصيغة 12 ساعة (ص/م)</small>
           <div class="mt-2">
             <label class="form-label">النوع</label>
             <select name="mode" class="form-select">
@@ -41,7 +40,6 @@
           </div>
           <button class="btn btn-primary w-100 mt-3">إضافة</button>
         </form>
-
         <hr>
         <h5 class="mb-2">إضافة اختبار</h5>
         <form method="post" action="{{ url_for('add_exam') }}">
@@ -76,50 +74,42 @@
     </div>
   </div>
 
-  <!-- العمود الأيمن: الجدول + التصدير -->
   <div class="col-lg-8">
-    <div class="d-flex gap-2 mb-2">
-      <button id="btnPNG" class="btn btn-outline-primary">تنزيل كصورة PNG</button>
-      <button id="btnPDF" class="btn btn-primary">تنزيل كملف PDF</button>
+    <div class="d-flex justify-content-between align-items-center mb-2">
+      <h5 class="m-0">جدولي</h5>
+      <div class="d-flex gap-2">
+        <button id="btnPNG" class="btn btn-outline-primary">تنزيل كصورة PNG</button>
+        <button id="btnPDF" class="btn btn-primary">تنزيل كملف PDF</button>
+      </div>
     </div>
 
-    <!-- منطقة الالتقاط -->
     <div id="capture" class="card shadow-sm p-3 schedule-card">
-      <div class="d-flex align-items-center justify-content-center gap-2 mb-2">
-        <img src="{{ url_for('static', filename='img/seu-logo.png') }}" alt="SEU" style="height:36px">
-        <h5 class="m-0">
-          <span class="seu-gradient">الجامعة السعودية الإلكترونية — جدولي الدراسي</span>
-        </h5>
+      <div class="d-flex align-items-center gap-2 mb-2">
+        <img src="{{ url_for('static', filename='img/seu-logo.png') }}" alt="SEU" style="height:34px">
+        <h5 class="m-0">الجامعة السعودية الإلكترونية — جدولي الدراسي</h5>
       </div>
 
-      {% set days = ["الأحد","الاثنين","الثلاثاء","الأربعاء","الخميس","الجمعة","السبت"] %}
-
-      <!-- سحب أفقي على الشاشات الضيقة + min-width للجدول -->
       <div class="table-responsive">
-        <table class="table table-bordered schedule-table align-middle text-center">
+        <table class="table table-bordered align-middle">
           <thead class="table-light">
             <tr>
-              {% for d in days %}
-                <th>{{ d }}</th>
+              {% for d in ["الأحد","الاثنين","الثلاثاء","الأربعاء","الخميس","الجمعة","السبت"] %}
+              <th class="text-center">{{ d }}</th>
               {% endfor %}
             </tr>
           </thead>
           <tbody>
             <tr>
-            {% for d in days %}
-              <td>
-                {% for c in courses|selectattr('day','equalto',d)|list %}
-                  <div class="mb-2 p-2 rounded-3 {{ 'badge-onsite' if c.mode=='حضوري' else 'badge-online' }}">
+            {% for d in ["الأحد","الاثنين","الثلاثاء","الأربعاء","الخميس","الجمعة","السبت"] %}
+              <td style="min-width:180px">
+                {% for c in courses if c.day == d %}
+                  <div class="badge w-100 text-wrap mb-2 {{ 'badge-online' if c.mode=='عن بعد' else 'badge-onsite' }}">
                     <div class="fw-bold">{{ c.title }}</div>
-                    <div class="small text-muted">
-                      {{ c.start|default('')|t12 }} – {{ c.end|default('')|t12 }} • {{ c.mode }}
-                    </div>
-                    <form method="post" action="{{ url_for('delete_course', cid=c.id) }}">
-                      <button class="btn btn-sm delete-btn mt-1" type="submit">حذف</button>
-                    </form>
+                    <div class="small">{{ c.start }} — {{ c.end }} • {{ c.mode }}</div>
                   </div>
-                {% else %}
-                  <div class="text-muted small">&nbsp;</div>
+                  <form method="post" action="{{ url_for('delete_course', cid=c.id) }}">
+                    <button class="btn btn-sm btn-outline-danger w-100 mb-2">حذف</button>
+                  </form>
                 {% endfor %}
               </td>
             {% endfor %}
@@ -127,44 +117,40 @@
           </tbody>
         </table>
       </div>
-      <!-- يظهر على الجوال فقط -->
-      <div class="text-muted small mt-1 d-lg-none">اسحب يمين/يسار لرؤية بقية الأيام</div>
 
       <h6 class="mt-3">الاختبارات</h6>
       <div class="table-responsive">
-        <table class="table table-sm table-bordered align-middle text-center">
+        <table class="table table-striped">
           <thead class="table-light">
-            <tr><th>المقرر</th><th>النوع</th><th>التاريخ</th><th>من</th><th>إلى</th><th></th></tr>
+            <tr>
+              <th>المقرر</th><th>النوع</th><th>التاريخ</th><th>من</th><th>إلى</th><th></th>
+            </tr>
           </thead>
           <tbody>
             {% for e in exams %}
               <tr>
-                <td class="fw-bold">{{ e.title }}</td>
-                <td>
-                  <span class="badge {{ 'badge-mid' if e.kind=='ميد' else 'badge-final' }}">{{ e.kind }}</span>
-                </td>
+                <td>{{ e.title }}</td>
+                <td>{{ e.kind }}</td>
                 <td>{{ e.date }}</td>
-                <td>{{ e.start|default('')|t12 }}</td>
-                <td>{{ e.end|default('')|t12 }}</td>
+                <td>{{ e.start }}</td>
+                <td>{{ e.end }}</td>
                 <td>
                   <form method="post" action="{{ url_for('delete_exam', eid=e.id) }}">
-                    <button class="btn btn-sm delete-btn" type="submit">حذف</button>
+                    <button class="btn btn-sm btn-outline-danger">حذف</button>
                   </form>
                 </td>
               </tr>
             {% else %}
-              <tr><td colspan="6" class="text-muted">لا يوجد اختبارات بعد.</td></tr>
+              <tr><td colspan="6" class="text-center text-muted">لا يوجد اختبارات بعد.</td></tr>
             {% endfor %}
           </tbody>
         </table>
       </div>
+
+      <div class="small text-muted text-center mt-3">
+        فكرة وتنفيذ المدرب <strong>منصور مباركي</strong> — تمت البرمجة بمساعدة <strong>ChatGPT</strong> • © 2025
+      </div>
     </div>
   </div>
 </div>
-{% endblock %}
-
-{% block scripts %}
-  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
-  <script src="{{ url_for('static', filename='js/export.js') }}?v=20"></script>
 {% endblock %}

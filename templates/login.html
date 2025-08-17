@@ -1,11 +1,12 @@
+
 {% extends "base.html" %}
 {% block content %}
 <div class="row justify-content-center">
-  <div class="col-md-6 col-lg-5">
+  <div class="col-md-6">
     <div class="card shadow-sm">
       <div class="card-body">
-        <h4 class="mb-3">تسجيل الدخول</h4>
-        <form method="post" action="{{ url_for('login') }}">
+        <h3 class="mb-3">تسجيل الدخول</h3>
+        <form method="post">
           <div class="mb-3">
             <label class="form-label">البريد الإلكتروني</label>
             <input type="email" name="email" class="form-control" required>
@@ -16,6 +17,9 @@
           </div>
           <button class="btn btn-primary w-100">دخول</button>
         </form>
+        <div class="text-center mt-3">
+          ليس لديك حساب؟ <a href="{{ url_for('register') }}">سجل الآن</a>
+        </div>
       </div>
     </div>
   </div>
