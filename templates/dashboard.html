@@ -3,6 +3,50 @@
 {% block content %}
 <h3 class="mb-3">مرحبًا {{ user.name }} 👋</h3>
 
+<div class="row g-3 mb-3">
+  <div class="col-6 col-lg-3">
+    <div class="card border-0 shadow-sm">
+      <div class="card-body text-center">
+        <div class="text-muted small">عدد المحاضرات</div>
+        <div class="display-6 fw-bold">{{ lec_count or 0 }}</div>
+        <div class="small"><span class="badge bg-success-subtle text-success">حضوري {{ onsite_count or 0 }}</span>
+          <span class="badge bg-primary-subtle text-primary">عن بعد {{ online_count or 0 }}</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="card border-0 shadow-sm">
+      <div class="card-body text-center">
+        <div class="text-muted small">إجمالي الساعات/الأسبوع</div>
+        <div class="display-6 fw-bold">{{ total_hours or 0 }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="card border-0 shadow-sm">
+      <div class="card-body text-center">
+        <div class="text-muted small">عدد الاختبارات</div>
+        <div class="display-6 fw-bold">{{ exam_count or 0 }}</div>
+        <div class="small"><span class="badge badge-mid">ميد {{ mid_count or 0 }}</span>
+          <span class="badge badge-final">فاينل {{ final_count or 0 }}</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="card border-0 shadow-sm">
+      <div class="card-body text-center">
+        <div class="text-muted small">تصدير الجدول</div>
+        <div class="d-flex gap-2 justify-content-center">
+          <button id="btnPNG" class="btn btn-sm btn-outline-secondary">PNG</button>
+          <button id="btnPDF" class="btn btn-sm btn-outline-dark">PDF</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+
 <div class="row g-4">
   <div class="col-lg-4">
     <div class="card shadow-sm">
@@ -130,7 +174,7 @@
             {% for e in exams %}
               <tr>
                 <td>{{ e.title }}</td>
-                <td>{{ e.kind }}</td>
+                <td><span class="{{ "badge-mid" if e.kind=="ميد" else "badge-final" }}">{{ e.kind }}</span></td>
                 <td>{{ e.date }}</td>
                 <td>{{ e.start }}</td>
                 <td>{{ e.end }}</td>

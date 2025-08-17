@@ -58,6 +58,17 @@ def login_required(f):
         return f(*args, **kwargs)
     return wrapper
 
+
+def admin_required(f):
+    @wraps(f)
+    def wrapper(*args, **kwargs):
+        u = current_user()
+        if not u or not getattr(u, 'is_admin', False):
+            flash('هذه الصفحة للمشرفين فقط', 'danger')
+            return redirect(url_for('index'))
+        return f(*args, **kwargs)
+    return wrapper
+
 def current_user():
     uid = session.get("user_id")
     if not uid:
@@ -85,6 +96,10 @@ def register():
             return redirect(url_for("register"))
         user = User(name=name, email=email, password_hash=generate_password_hash(password))
         db.session.add(user)
+        db.session.flush()
+        # اجعل أول مستخدم مشرف تلقائياً
+        if User.query.count() == 0:
+            user.is_admin = True
         db.session.commit()
         flash("تم التسجيل بنجاح! سجل الدخول الآن.", "success")
         return redirect(url_for("login"))
@@ -116,7 +131,25 @@ def dashboard():
     user = current_user()
     courses = Course.query.filter_by(user_id=user.id).all()
     exams = Exam.query.filter_by(user_id=user.id).all()
-    return render_template("dashboard.html", user=user, courses=courses, exams=exams)
+# --- إحصائيات المستخدم ---
+def _to_minutes(t):
+    try:
+        h, m = map(int, t.split(":"))
+        return h*60 + m
+    except Exception:
+        return 0
+
+lec_count = len(courses)
+onsite_count = sum(1 for c in courses if c.mode == "حضوري")
+online_count = lec_count - onsite_count
+total_minutes = sum(max(0, _to_minutes(c.end) - _to_minutes(c.start)) for c in courses)
+total_hours = round(total_minutes / 60, 2)
+
+exam_count = len(exams)
+mid_count = sum(1 for e in exams if e.kind == "ميد")
+final_count = sum(1 for e in exams if e.kind == "فاينل")
+
+    return render_template("dashboard.html", user=user, courses=courses, exams=exams, lec_count=lec_count, onsite_count=onsite_count, online_count=online_count, total_hours=total_hours, exam_count=exam_count, mid_count=mid_count, final_count=final_count)
 
 @app.route("/course", methods=["POST"])
 @login_required
@@ -197,3 +230,65 @@ if __name__ == "__main__":
     with app.app_context():
         db.create_all()
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 8080)))
+
+
+
+@app.route("/admin")
+@login_required
+@admin_required
+def admin_dashboard():
+    users = User.query.order_by(User.id.desc()).all()
+    return render_template("admin.html",
+        users=users,
+        user_count=User.query.count(),
+        admin_count=User.query.filter_by(is_admin=True).count(),
+        course_count=Course.query.count(),
+        exam_count=Exam.query.count())
+
+@app.post("/admin/user/<int:uid>/make-admin")
+@login_required
+@admin_required
+def make_admin(uid):
+    u = User.query.get_or_404(uid)
+    u.is_admin = True
+    db.session.commit()
+    flash("تمت ترقية المستخدم إلى مشرف.", "success")
+    return redirect(url_for('admin_dashboard'))
+
+@app.post("/admin/user/<int:uid>/remove-admin")
+@login_required
+@admin_required
+def remove_admin(uid):
+    u = User.query.get_or_404(uid)
+    u.is_admin = False
+    db.session.commit()
+    flash("تمت إزالة صلاحيات المشرف.", "warning")
+    return redirect(url_for('admin_dashboard'))
+
+@app.post("/admin/user/<int:uid>/delete")
+@login_required
+@admin_required
+def delete_user_admin(uid):
+    # حذف المستخدم وكل بياناته
+    Course.query.filter_by(user_id=uid).delete()
+    Exam.query.filter_by(user_id=uid).delete()
+    User.query.filter_by(id=uid).delete()
+    db.session.commit()
+    flash("تم حذف المستخدم وبياناته.", "danger")
+    return redirect(url_for('admin_dashboard'))
+
+@app.post("/admin/clear-all")
+@login_required
+@admin_required
+def clear_all_data():
+    Course.query.delete()
+    Exam.query.delete()
+    db.session.commit()
+    flash("تم مسح كل المحاضرات والاختبارات.", "warning")
+    return redirect(url_for('admin_dashboard'))
+
+
+
+@app.get("/health")
+def health():
+    return "ok", 200
