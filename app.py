@@ -1,10 +1,13 @@
-
 import os
 from datetime import datetime, date, time
+from functools import wraps
+
 from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
-from functools import wraps
+
+# For lightweight migrations / inspection
+from sqlalchemy import inspect, text as sa_text
 
 # ============== Config ==============
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
@@ -12,6 +15,7 @@ DB_PATH = os.path.join(BASE_DIR, "app.db")
 
 app = Flask(__name__, static_folder="static", template_folder="templates")
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "change-me-in-prod")
+
 DATABASE_URL = os.environ.get("DATABASE_URL", "")
 if DATABASE_URL:
     # fly.io often provides postgres:// - normalize to postgresql+psycopg2://
@@ -19,37 +23,52 @@ if DATABASE_URL:
         DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql+psycopg2://", 1)
     app.config["SQLALCHEMY_DATABASE_URI"] = DATABASE_URL
 else:
+    # Default to a local SQLite DB (dev)
     app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///app.db"
 
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 db = SQLAlchemy(app)
 
+
 # ============== Models ==============
 class User(db.Model):
+    __tablename__ = "user"
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(120))
     email = db.Column(db.String(120), unique=True, nullable=False)
     password_hash = db.Column(db.String(255), nullable=False)
+    # NEW: admin flag
+    is_admin = db.Column(db.Boolean, default=False, nullable=False)
+
 
 class Course(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
     title = db.Column(db.String(200), nullable=False)
-    day = db.Column(db.String(20), nullable=False)  # Sunday..Saturday
-    start = db.Column(db.String(5), nullable=False) # "16:00"
-    end = db.Column(db.String(5), nullable=False)   # "16:50"
+    day = db.Column(db.String(20), nullable=False)   # Sunday..Saturday
+    start = db.Column(db.String(5), nullable=False)  # "16:00"
+    end = db.Column(db.String(5), nullable=False)    # "16:50"
     mode = db.Column(db.String(20), default="حضوري")  # حضوري / عن بعد
+
 
 class Exam(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
     title = db.Column(db.String(200), nullable=False)
     kind = db.Column(db.String(20), nullable=False)  # ميد / فاينل
     date = db.Column(db.String(10), nullable=False)  # 2025-08-20
     start = db.Column(db.String(5), nullable=False)
     end = db.Column(db.String(5), nullable=False)
 
+
 # ============== Helpers ==============
+def current_user():
+    uid = session.get("user_id")
+    if not uid:
+        return None
+    return User.query.get(uid)
+
+
 def login_required(f):
     @wraps(f)
     def wrapper(*args, **kwargs):
@@ -63,17 +82,12 @@ def admin_required(f):
     @wraps(f)
     def wrapper(*args, **kwargs):
         u = current_user()
-        if not u or not getattr(u, 'is_admin', False):
-            flash('هذه الصفحة للمشرفين فقط', 'danger')
-            return redirect(url_for('index'))
+        if not u or not getattr(u, "is_admin", False):
+            flash("هذه الصفحة للمشرفين فقط", "danger")
+            return redirect(url_for("index"))
         return f(*args, **kwargs)
     return wrapper
 
-def current_user():
-    uid = session.get("user_id")
-    if not uid:
-        return None
-    return User.query.get(uid)
 
 # ============== Routes ==============
 @app.route("/")
@@ -82,34 +96,45 @@ def index():
         return redirect(url_for("dashboard"))
     return render_template("index.html")
 
+
 @app.route("/register", methods=["GET", "POST"])
 def register():
     if request.method == "POST":
-        name = request.form.get("name","").strip()
-        email = request.form.get("email","").strip().lower()
-        password = request.form.get("password","")
+        name = request.form.get("name", "").strip()
+        email = request.form.get("email", "").strip().lower()
+        password = request.form.get("password", "")
+
         if not name or not email or not password:
             flash("يرجى تعبئة جميع الحقول", "danger")
             return redirect(url_for("register"))
+
         if User.query.filter_by(email=email).first():
             flash("البريد مستخدم مسبقًا", "danger")
             return redirect(url_for("register"))
-        user = User(name=name, email=email, password_hash=generate_password_hash(password))
+
+        # NEW: اجعل أول مستخدم مشرف تلقائياً
+        is_first_user = (User.query.count() == 0)
+
+        user = User(
+            name=name,
+            email=email,
+            password_hash=generate_password_hash(password),
+            is_admin=is_first_user,
+        )
         db.session.add(user)
-        db.session.flush()
-        # اجعل أول مستخدم مشرف تلقائياً
-        if User.query.count() == 0:
-            user.is_admin = True
         db.session.commit()
+
         flash("تم التسجيل بنجاح! سجل الدخول الآن.", "success")
         return redirect(url_for("login"))
+
     return render_template("register.html")
+
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
-        email = request.form.get("email","").strip().lower()
-        password = request.form.get("password","")
+        email = request.form.get("email", "").strip().lower()
+        password = request.form.get("password", "")
         user = User.query.filter_by(email=email).first()
         if not user or not check_password_hash(user.password_hash, password):
             flash("بيانات الدخول غير صحيحة", "danger")
@@ -119,11 +144,13 @@ def login():
         return redirect(url_for("dashboard"))
     return render_template("login.html")
 
+
 @app.route("/logout")
 def logout():
     session.clear()
     flash("تم تسجيل الخروج", "info")
     return redirect(url_for("index"))
+
 
 @app.route("/dashboard")
 @login_required
@@ -136,18 +163,22 @@ def dashboard():
     def _to_minutes(t):
         try:
             h, m = map(int, str(t).split(":"))
-            return h*60 + m
+            return h * 60 + m
         except Exception:
             return 0
 
     lec_count = len(courses)
+
     onsite_keywords = {"حضوري", "onsite", "inperson", "presence"}
     online_keywords = {"عن بعد", "اونلاين", "online", "remote"}
     onsite_count = sum(1 for c in courses if str(c.mode).strip() in onsite_keywords)
     online_count = sum(1 for c in courses if str(c.mode).strip() in online_keywords)
 
-    total_minutes = sum(max(0, _to_minutes(getattr(c, "end", "0:00")) - _to_minutes(getattr(c, "start", "0:00"))) for c in courses)
-    total_hours = round(total_minutes/60, 2)
+    total_minutes = sum(
+        max(0, _to_minutes(getattr(c, "end", "0:00")) - _to_minutes(getattr(c, "start", "0:00")))
+        for c in courses
+    )
+    total_hours = round(total_minutes / 60, 2)
 
     exam_count = len(exams)
     mid_count = sum(1 for e in exams if getattr(e, "kind", "") == "ميد")
@@ -167,6 +198,7 @@ def dashboard():
         final_count=final_count,
     )
 
+
 @app.route("/course", methods=["POST"])
 @login_required
 def add_course():
@@ -174,16 +206,17 @@ def add_course():
     data = request.form
     course = Course(
         user_id=user.id,
-        title=data.get("title","").strip(),
+        title=data.get("title", "").strip(),
         day=data.get("day"),
         start=data.get("start"),
         end=data.get("end"),
-        mode=data.get("mode","حضوري"),
+        mode=data.get("mode", "حضوري"),
     )
     db.session.add(course)
     db.session.commit()
     flash("تمت إضافة المحاضرة.", "success")
     return redirect(url_for("dashboard"))
+
 
 @app.route("/exam", methods=["POST"])
 @login_required
@@ -192,7 +225,7 @@ def add_exam():
     data = request.form
     exam = Exam(
         user_id=user.id,
-        title=data.get("title","").strip(),
+        title=data.get("title", "").strip(),
         kind=data.get("kind"),
         date=data.get("date"),
         start=data.get("start"),
@@ -202,6 +235,7 @@ def add_exam():
     db.session.commit()
     flash("تمت إضافة الاختبار.", "success")
     return redirect(url_for("dashboard"))
+
 
 @app.route("/course/<int:cid>/delete", methods=["POST"])
 @login_required
@@ -213,6 +247,7 @@ def delete_course(cid):
     flash("تم حذف المحاضرة.", "info")
     return redirect(url_for("dashboard"))
 
+
 @app.route("/exam/<int:eid>/delete", methods=["POST"])
 @login_required
 def delete_exam(eid):
@@ -223,43 +258,22 @@ def delete_exam(eid):
     flash("تم حذف الاختبار.", "info")
     return redirect(url_for("dashboard"))
 
-# API for exporting data as JSON (optional)
-@app.route("/api/my-schedule")
-@login_required
-def api_schedule():
-    user = current_user()
-    courses = [{
-        "title": c.title, "day": c.day, "start": c.start, "end": c.end, "mode": c.mode
-    } for c in Course.query.filter_by(user_id=user.id)]
-    exams = [{
-        "title": e.title, "kind": e.kind, "date": e.date, "start": e.start, "end": e.end
-    } for e in Exam.query.filter_by(user_id=user.id)]
-    return jsonify({"courses": courses, "exams": exams})
 
-# CLI init
-@app.cli.command("init-db")
-def init_db():
-    db.create_all()
-    print("Database initialized.")
-
-if __name__ == "__main__":
-    with app.app_context():
-        db.create_all()
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 8080)))
-
-
-
+# ---------- Admin ----------
 @app.route("/admin")
 @login_required
 @admin_required
 def admin_dashboard():
     users = User.query.order_by(User.id.desc()).all()
-    return render_template("admin.html",
+    return render_template(
+        "admin.html",
         users=users,
         user_count=User.query.count(),
         admin_count=User.query.filter_by(is_admin=True).count(),
         course_count=Course.query.count(),
-        exam_count=Exam.query.count())
+        exam_count=Exam.query.count(),
+    )
+
 
 @app.post("/admin/user/<int:uid>/make-admin")
 @login_required
@@ -269,7 +283,8 @@ def make_admin(uid):
     u.is_admin = True
     db.session.commit()
     flash("تمت ترقية المستخدم إلى مشرف.", "success")
-    return redirect(url_for('admin_dashboard'))
+    return redirect(url_for("admin_dashboard"))
+
 
 @app.post("/admin/user/<int:uid>/remove-admin")
 @login_required
@@ -279,7 +294,8 @@ def remove_admin(uid):
     u.is_admin = False
     db.session.commit()
     flash("تمت إزالة صلاحيات المشرف.", "warning")
-    return redirect(url_for('admin_dashboard'))
+    return redirect(url_for("admin_dashboard"))
+
 
 @app.post("/admin/user/<int:uid>/delete")
 @login_required
@@ -291,7 +307,8 @@ def delete_user_admin(uid):
     User.query.filter_by(id=uid).delete()
     db.session.commit()
     flash("تم حذف المستخدم وبياناته.", "danger")
-    return redirect(url_for('admin_dashboard'))
+    return redirect(url_for("admin_dashboard"))
+
 
 @app.post("/admin/clear-all")
 @login_required
@@ -301,11 +318,61 @@ def clear_all_data():
     Exam.query.delete()
     db.session.commit()
     flash("تم مسح كل المحاضرات والاختبارات.", "warning")
-    return redirect(url_for('admin_dashboard'))
+    return redirect(url_for("admin_dashboard"))
 
 
+# API for exporting data as JSON (optional)
+@app.route("/api/my-schedule")
+@login_required
+def api_schedule():
+    user = current_user()
+    courses = [
+        {"title": c.title, "day": c.day, "start": c.start, "end": c.end, "mode": c.mode}
+        for c in Course.query.filter_by(user_id=user.id)
+    ]
+    exams = [
+        {"title": e.title, "kind": e.kind, "date": e.date, "start": e.start, "end": e.end}
+        for e in Exam.query.filter_by(user_id=user.id)
+    ]
+    return jsonify({"courses": courses, "exams": exams})
 
+
+# ---------- Health ----------
 @app.route("/health", methods=["GET"])
 def health():
     return "ok", 200
 
+
+# ---------- CLI ----------
+@app.cli.command("init-db")
+def init_db():
+    """Create tables if not exists (dev convenience)."""
+    db.create_all()
+    print("Database initialized.")
+
+
+@app.cli.command("upgrade-db")
+def upgrade_db():
+    """
+    Lightweight migration:
+    - Add is_admin to user if missing.
+    """
+    insp = inspect(db.engine)
+    cols = [c["name"] for c in insp.get_columns("user")]
+    if "is_admin" not in cols:
+        # Works for SQLite and Postgres; "user" is reserved in PG, so keep it quoted.
+        stmt = 'ALTER TABLE "user" ADD COLUMN is_admin BOOLEAN DEFAULT 0'
+        with db.engine.begin() as conn:
+            conn.execute(sa_text(stmt))
+        print("Added is_admin column to user table.")
+    else:
+        print("is_admin column already exists.")
+    print("Upgrade complete.")
+
+
+if __name__ == "__main__":
+    # Create tables in dev/run-first-boot scenarios
+    with app.app_context():
+        db.create_all()
+    # Run dev server only if invoked directly
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 8080)))
