@@ -1,0 +1,54 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="py-4">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h3 class="mb-0">لوحة المشرف</h3>
+    <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('dashboard') }}">الرجوع للوحة المستخدم</a>
+  </div>
+  <div class="row g-3 mb-3">
+    <div class="col"><div class="card"><div class="card-body text-center"><div class="fw-bold">المستخدمون</div><div class="display-6">{{ user_count }}</div></div></div></div>
+    <div class="col"><div class="card"><div class="card-body text-center"><div class="fw-bold">المشرفون</div><div class="display-6">{{ admin_count }}</div></div></div></div>
+    <div class="col"><div class="card"><div class="card-body text-center"><div class="fw-bold">المحاضرات</div><div class="display-6">{{ course_count }}</div></div></div></div>
+    <div class="col"><div class="card"><div class="card-body text-center"><div class="fw-bold">الاختبارات</div><div class="display-6">{{ exam_count }}</div></div></div></div>
+  </div>
+  <div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <span>إدارة المستخدمين</span>
+      <form method="post" action="{{ url_for('clear_all_data') }}" onsubmit="return confirm('مسح جميع المحاضرات والاختبارات؟');">
+        <button class="btn btn-sm btn-outline-danger">مسح كل الجداول والاختبارات</button>
+      </form>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-striped mb-0">
+        <thead><tr><th>#</th><th>الاسم</th><th>البريد</th><th>مشرف؟</th><th class="text-end">إجراءات</th></tr></thead>
+        <tbody>
+          {% for u in users %}
+          <tr>
+            <td>{{ u.id }}</td>
+            <td>{{ u.name or '-' }}</td>
+            <td>{{ u.email }}</td>
+            <td>{{ 'نعم' if u.is_admin else 'لا' }}</td>
+            <td>
+              <div class="d-flex gap-2 justify-content-end">
+                {% if not u.is_admin %}
+                <form method="post" action="{{ url_for('make_admin', uid=u.id) }}">
+                  <button class="btn btn-sm btn-success">ترقية لمشرف</button>
+                </form>
+                {% else %}
+                <form method="post" action="{{ url_for('remove_admin', uid=u.id) }}" onsubmit="return confirm('إزالة صلاحية المشرف؟');">
+                  <button class="btn btn-sm btn-warning">إلغاء المشرف</button>
+                </form>
+                {% endif %}
+                <form method="post" action="{{ url_for('delete_user_admin', uid=u.id) }}" onsubmit="return confirm('حذف هذا المستخدم مع جميع بياناته؟');">
+                  <button class="btn btn-sm btn-outline-danger">حذف المستخدم</button>
+                </form>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,24 @@
+:root{ --seu-a:#0dc4b0; --seu-b:#2c6cd4; --seu-c:#7b1fa2; }
+.seu-gradient{ background:linear-gradient(90deg,var(--seu-a),var(--seu-b),var(--seu-c)); -webkit-background-clip:text; background-clip:text; color:transparent; font-weight:800; }
+.badge-onsite{ background:#e8f5e9; border:1px solid #a5d6a7; color:#1b5e20; font-weight:700; }
+.badge-online{ background:#e3f2fd; border:1px solid #90caf9; color:#0d47a1; font-weight:700; }
+.badge-mid{ background:#fff8e1; border:1px solid #ffb300; color:#e65100; font-weight:700; }
+.badge-final{ background:#f3e5f5; border:1px solid #ab47bc; color:#4a148c; font-weight:700; }
+.schedule-card{ background:#fff; border-radius:16px; }
+.schedule-table td{ color:#111; font-weight:600; font-size:15px; }
+.schedule-table td div{ padding:6px; border-radius:8px; text-align:center; background:transparent; color:inherit; }
+.delete-btn{ background:#ffebee; border:1px solid #e53935; color:#b71c1c; font-weight:700; border-radius:6px; padding:4px 10px; cursor:pointer; transition:.2s; }
+.delete-btn:hover{ background:#e53935; color:#fff; }
+footer{ background:#fafafa; color:#444; font-weight:500; }
+
+#export-work{ position:fixed; left:-99999px; top:0; width:0; height:0; overflow:hidden; z-index:-1; }
+.export-clone{ display:block; box-sizing:border-box; padding:12px; background:#fff; }
+.export-mode *{ color:#111 !important; -webkit-text-fill-color:#111 !important; font-weight:700 !important; text-shadow:none !important; filter:none !important; }
+.export-mode .seu-gradient{ background:none !important; -webkit-background-clip:initial !important; background-clip:initial !important; color:#111 !important; }
+.export-mode .table-responsive{ overflow: visible !important; }
+
+.schedule-card .table-responsive{ overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.schedule-table{ min-width: 1260px; table-layout: fixed; }
+.schedule-table th, .schedule-table td{ width: 180px; white-space: normal; }
+.schedule-card .table-responsive::-webkit-scrollbar{ height: 8px; }
+.schedule-card .table-responsive::-webkit-scrollbar-thumb{ background: #d0d7de; border-radius: 6px; }

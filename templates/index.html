@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="row align-items-center">
+  <div class="col-lg-6">
+    <h2 class="mb-3">منظّم جداول طلاب <span class="seu-gradient">الجامعة السعودية الإلكترونية</span></h2>
+    <p class="text-muted">أنشئ حسابك، أدخل محاضراتك واختباراتك، ثم نزّل جدولك كصورة أو PDF بجودة عالية — مناسب للجوال والكمبيوتر.</p>
+    <a href="{{ url_for('register') }}" class="btn btn-primary me-2">ابدأ الآن</a>
+    <a href="{{ url_for('login') }}" class="btn btn-outline-primary">تسجيل الدخول</a>
+  </div>
+  <div class="col-lg-6 text-center">
+    <img src="{{ url_for('static', filename='img/seu-logo.png') }}" class="img-fluid" alt="SEU">
+  </div>
+</div>
+{% endblock %}

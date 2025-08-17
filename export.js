@@ -1,0 +1,1 @@
+function downloadAsImage(){window.print();}

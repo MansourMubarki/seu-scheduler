@@ -1,0 +1,42 @@
+:root{ --seu-a:#0dc4b0; --seu-b:#2c6cd4; --seu-c:#7b1fa2; }
+.seu-gradient{ background:linear-gradient(90deg,var(--seu-a),var(--seu-b),var(--seu-c)); -webkit-background-clip:text; background-clip:text; color:transparent; font-weight:800; }
+
+/* ألوان المحاضرات */
+.schedule-table .badge-onsite{ background:#e8f5e9 !important; border:1px solid #a5d6a7 !important; color:#1b5e20 !important; font-weight:700; }
+.schedule-table .badge-online{ background:#e3f2fd !important; border:1px solid #90caf9 !important; color:#0d47a1 !important; font-weight:700; }
+
+/* بادجات الامتحانات */
+.badge-mid{ background:#fff8e1; border:1px solid #ffcc80; color:#e65100; font-weight:700; }
+.badge-final{ background:#fce4ec; border:1px solid #f48fb1; color:#880e4f; font-weight:700; }
+
+.schedule-card{ background:#fff; border-radius:16px; }
+.schedule-table td{ color:#111; font-weight:600; font-size:15px; }
+.schedule-table td div{ padding:6px; border-radius:8px; text-align:center; background:transparent; color:inherit; }
+
+.delete-btn{ background:#ffebee; border:1px solid #e53935; color:#b71c1c; font-weight:700; border-radius:6px; padding:4px 10px; cursor:pointer; transition:.2s; }
+.delete-btn:hover{ background:#e53935; color:#fff; }
+
+footer{ background:#fafafa; color:#444; font-weight:500; }
+
+/* سحب أفقي + min-width للجدول على الشاشات الضيقة */
+.schedule-card .table-responsive{ overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.schedule-table{ min-width: 1260px; table-layout: fixed; }
+.schedule-table th, .schedule-table td{ width: 180px; white-space: normal; }
+
+/* شريط سحب شكلي */
+.schedule-card .table-responsive::-webkit-scrollbar{ height:8px; }
+.schedule-card .table-responsive::-webkit-scrollbar-thumb{ background:#d0d7de; border-radius:6px; }
+/* مساحة عمل خفية للتصدير — مرئية لكن خارج الشاشة (أفضل من visibility:hidden) */
+#export-work{
+  position: fixed;
+  left: -99999px;
+  top: 0;
+  pointer-events: none;
+  background: #fff;
+}
+.export-clone{ display:block; box-sizing:border-box; padding:12px; background:#fff; }
+
+/* أثناء التصدير نوقف التدرج ونعتم النص */
+.export-mode *{ color:#111 !important; -webkit-text-fill-color:#111 !important; text-shadow:none !important; filter:none !important; }
+.export-mode .table-responsive{ overflow: visible !important; }
+.export-mode .seu-gradient{ background:none !important; -webkit-background-clip:initial !important; background-clip:initial !important; color:#111 !important; }
