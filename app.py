@@ -305,6 +305,7 @@ def clear_all_data():
 
 
 
-@app.get("/health")
+@app.route("/health", methods=["GET"])
 def health():
     return "ok", 200
+
