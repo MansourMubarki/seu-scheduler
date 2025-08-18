@@ -43,7 +43,7 @@ class User(db.Model):
     name = db.Column(db.String(120))
     email = db.Column(db.String(120), unique=True, nullable=False)
     password_hash = db.Column(db.String(255), nullable=False)
-
+    is_admin = db.Column(db.Boolean, default=False, nullable=False)
 class Course(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
@@ -75,6 +75,23 @@ def current_user():
     uid = session.get("user_id")
     return User.query.get(uid) if uid else None
 
+
+
+# --- Admin helper/decorators ---
+def admin_required(f):
+    @wraps(f)
+    def wrapper(*args, **kwargs):
+        u = current_user()
+        if not u or not getattr(u, 'is_admin', False):
+            flash('هذه الصفحة للمشرفين فقط', 'danger')
+            return redirect(url_for('index'))
+        return f(*args, **kwargs)
+    return wrapper
+
+@app.context_processor
+def inject_user():
+    u = current_user()
+    return {'auth_user': u, 'is_admin': (u.is_admin if u else False)}
 # ---- Routes ----
 @app.get("/healthz")
 def healthz(): return "ok", 200
@@ -97,8 +114,11 @@ def register():
         if User.query.filter_by(email=email).first():
             flash("البريد مستخدم مسبقًا", "danger")
             return redirect(url_for("register"))
-        user = User(name=name, email=email, password_hash=generate_password_hash(password))
+        first = (User.query.count() == 0)
+        user = User(name=name, email=email, password_hash=generate_password_hash(password), is_admin=first)
         db.session.add(user); db.session.commit()
+        if first:
+            flash('تم إنشاء حسابك كمشرف (أول مستخدم).', 'info')
         flash("تم التسجيل بنجاح! سجل الدخول الآن.", "success")
         return redirect(url_for("login"))
     return render_template("register.html")
@@ -183,18 +203,77 @@ def api_schedule():
 def init_db():
     db.create_all(); print("Database initialized.")
 
+
+# ---- Admin Panel ----
+@app.route("/admin")
+@login_required
+@admin_required
+def admin_dashboard():
+    users = User.query.order_by(User.id.asc()).all()
+    from models import Course if False else None  # placeholder if linter
+    user_count = User.query.count()
+    admin_count = User.query.filter_by(is_admin=True).count()
+    course_count = Course.query.count() if 'Course' in globals() else 0
+    exam_count = Exam.query.count() if 'Exam' in globals() else 0
+    return render_template("admin.html",
+                           users=users,
+                           user_count=user_count,
+                           admin_count=admin_count,
+                           course_count=course_count,
+                           exam_count=exam_count)
+
+@app.post("/admin/user/<int:uid>/make-admin")
+@login_required
+@admin_required
+def make_admin(uid):
+    u = User.query.get_or_404(uid)
+    u.is_admin = True
+    db.session.commit()
+    flash("تمت ترقية المستخدم إلى مشرف.", "success")
+    return redirect(url_for('admin_dashboard'))
+
+@app.post("/admin/user/<int:uid>/remove-admin")
+@login_required
+@admin_required
+def remove_admin(uid):
+    u = User.query.get_or_404(uid)
+    # لا تقم بإزالة آخر مشرف
+    if User.query.filter_by(is_admin=True).count() <= 1 and u.is_admin:
+        flash("لا يمكن إزالة آخر مشرف.", "danger")
+        return redirect(url_for('admin_dashboard'))
+    u.is_admin = False
+    db.session.commit()
+    flash("تمت إزالة صلاحية المشرف.", "info")
+    return redirect(url_for('admin_dashboard'))
+
+@app.post("/admin/user/<int:uid>/delete")
+@login_required
+@admin_required
+def delete_user_admin(uid):
+    # منع حذف نفسك
+    if current_user().id == uid:
+        flash("لا يمكنك حذف نفسك.", "danger")
+        return redirect(url_for('admin_dashboard'))
+    # حذف بيانات المستخدم
+    Course.query.filter_by(user_id=uid).delete()
+    Exam.query.filter_by(user_id=uid).delete()
+    u = User.query.get_or_404(uid)
+    db.session.delete(u)
+    db.session.commit()
+    flash("تم حذف المستخدم وجميع بياناته.", "warning")
+    return redirect(url_for('admin_dashboard'))
+
+@app.post("/admin/clear-all")
+@login_required
+@admin_required
+def clear_all_data():
+    # مسح جميع المحاضرات والاختبارات (تبقى حسابات المستخدمين)
+    Course.query.delete()
+    Exam.query.delete()
+    db.session.commit()
+    flash("تم مسح كل المحاضرات والاختبارات.", "warning")
+    return redirect(url_for('admin_dashboard'))
+
 if __name__ == "__main__":
     with app.app_context(): db.create_all()
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 8080)))
-@app.route("/make_admin")
-def make_admin():
-    from app import db, User
-    u = User.query.filter_by(email="metuo@msn.com").first()
-    if u:
-        u.role = "admin"
-    else:
-        u = User(username="Metuo", email="metuo@msn.com", role="admin")
-        u.set_password("StrongPassword123")  # غيّر الباسورد إذا تبي
-        db.session.add(u)
-    db.session.commit()
-    return "✅ تمت إضافة metuo@msn.com كأدمن"
