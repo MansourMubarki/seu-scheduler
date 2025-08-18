@@ -1,0 +1,27 @@
+{% extends "base.html" %}{% block content %}
+<h2>مهامي</h2>
+<form class="card p-3" method="post" action="{{ url_for('tasks_create') }}">
+  <div class="row g-2">
+    <div class="col-md-3"><label class="form-label">العنوان</label><input name="title" class="form-control" required></div>
+    <div class="col-md-2"><label class="form-label">النوع</label><select name="kind" class="form-select"><option>واجب</option><option>كويز</option><option>مشروع</option><option>أخرى</option></select></div>
+    <div class="col-md-3"><label class="form-label">المادة (اختياري)</label><select name="course_id" class="form-select"><option value="">—</option>{% for c in courses %}<option value="{{ c.id }}">{{ c.title }}</option>{% endfor %}</select></div>
+    <div class="col-md-2"><label class="form-label">تاريخ الاستحقاق</label><input type="date" name="due_date" class="form-control" required></div>
+    <div class="col-md-2"><label class="form-label">الوقت (اختياري)</label><input type="time" name="due_time" class="form-control"></div>
+    <div class="col-md-2"><label class="form-label">تنبيه قبل (دقائق)</label><input type="number" name="remind_minutes" class="form-control" value="30" min="0" step="5"></div>
+    <div class="col-12"><label class="form-label">ملاحظات</label><textarea name="notes" class="form-control" rows="2"></textarea></div>
+    <div class="col-12 mt-2"><button class="btn btn-primary">إضافة مهمة</button><a class="btn btn-outline-success" href="{{ url_for('download_calendar') }}">تصدير للتقويم (.ics)</a></div>
+  </div>
+</form>
+<table class="table mt-3">
+  <thead><tr><th>#</th><th>العنوان</th><th>النوع</th><th>المادة</th><th>التاريخ</th><th>الوقت</th><th>تنبيه</th><th></th></tr></thead>
+  <tbody>{% for t in tasks %}
+    <tr>
+      <td>{{ t.id }}</td><td>{{ t.title }}</td><td>{{ t.kind }}</td>
+      <td>{{ (t.course_id and courses|selectattr('id','equalto',t.course_id)|first.title) or '—' }}</td>
+      <td>{{ t.due_date }}</td><td>{{ t.due_time or '—' }}</td><td>{{ t.remind_minutes }} د</td>
+      <td><form method="post" action="{{ url_for('tasks_delete', tid=t.id) }}" onsubmit="return confirm('حذف المهمة؟');">
+        <button class="btn btn-sm btn-danger">حذف</button></form></td>
+    </tr>{% endfor %}
+  </tbody>
+</table>
+{% endblock %}

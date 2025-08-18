@@ -168,3 +168,41 @@
   <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
   <script src="{{ url_for('static', filename='js/export.js') }}?v=20"></script>
 {% endblock %}
+
+
+<div class="mb-3">
+  <a class="btn btn-primary" href="{{ url_for('download_calendar') }}">تنزيل التقويم (.ics)</a>
+  <button class="btn btn-secondary" onclick="window.print()">طباعة الجدول</button>
+  <button class="btn btn-info" id="btn-save-jpg">حفظ الجدول كصورة JPG</button>
+  <a class="btn btn-outline-success" href="{{ url_for('tasks_page') }}">مهامي</a>
+</div>
+
+<canvas id="hoursChart" width="400" height="220"></canvas>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+<script>
+fetch('{{ url_for("stats_json") }}').then(r=>r.json()).then(d=>{
+  const ctx=document.getElementById('hoursChart');
+  const presentH=(d.present_minutes/60).toFixed(1);
+  const remoteH=(d.remote_minutes/60).toFixed(1);
+  new Chart(ctx,{type:'doughnut',data:{labels:['حضوري (ساعات)','عن بُعد (ساعات)'],datasets:[{data:[presentH,remoteH]}]}});
+});
+document.addEventListener('click', async (e)=>{
+  if(e.target && e.target.id==='btn-save-jpg'){
+    const el=document.getElementById('schedule')||document.body;
+    const canvas=await html2canvas(el,{scale:2});
+    const url=canvas.toDataURL('image/jpeg',0.95);
+    const a=document.createElement('a'); a.href=url; a.download='schedule.jpg'; a.click();
+  }
+});
+</script>
+
+<style>
+@media print {
+  body * { visibility: hidden !important; }
+  #schedule, #schedule * { visibility: visible !important; }
+  #schedule { position: absolute; left: 0; top: 0; width: 100%; }
+}
+</style>
+

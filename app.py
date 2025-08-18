@@ -1,3 +1,4 @@
+from datetime import timedelta, datetime
 from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -315,3 +316,129 @@ if __name__ == "__main__":
     with app.app_context():
         db.create_all()
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 8080)))
+
+
+class Task(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    course_id = db.Column(db.Integer, db.ForeignKey('course.id'), nullable=True)
+    title = db.Column(db.String(200), nullable=False)
+    kind = db.Column(db.String(20), nullable=False)
+    due_date = db.Column(db.String(10), nullable=False)
+    due_time = db.Column(db.String(5), nullable=True)
+    remind_minutes = db.Column(db.Integer, default=30)
+    notes = db.Column(db.Text, default="")
+
+
+@app.get("/stats.json")
+@login_required
+def stats_json():
+    user = current_user()
+    def dur(a,b):
+        ah,am = map(int,a.split(":"))
+        bh,bm = map(int,b.split(":"))
+        return max(0,(bh*60+bm)-(ah*60+am))
+    pres = 0
+    remote = 0
+    for c in Course.query.filter_by(user_id=user.id):
+        mins = dur(c.start, c.end) if c.start and c.end else 0
+        if (c.mode or "").strip() == "عن بعد":
+            remote += mins
+        else:
+            pres += mins
+    return jsonify({"present_minutes": pres, "remote_minutes": remote})
+
+
+@app.get("/calendar.ics")
+@login_required
+def download_calendar():
+    user = current_user()
+    tzid = "Asia/Riyadh"
+    DAY_AR2BYDAY = {
+        "الأحد": "SU", "اﻷحد":"SU", "الاحد":"SU",
+        "الاثنين":"MO","الثلاثاء":"TU","الأربعاء":"WE","الاربعاء":"WE","الخميس":"TH","الجمعة":"FR","السبت":"SA",
+    }
+    def esc(s):
+        return (s or "").replace(",", r"\,").replace(";", r"\;").replace("\n", r"\n")
+    lines = ["BEGIN:VCALENDAR","VERSION:2.0","PRODID:-//seu-scheduler//ar//EN","CALSCALE:GREGORIAN"]
+    today = datetime.now().strftime("%Y%m%d")
+    # weekly courses
+    for c in Course.query.filter_by(user_id=user.id):
+        byday = DAY_AR2BYDAY.get(c.day)
+        if not byday:
+            continue
+        lines += [
+            "BEGIN:VEVENT",
+            f"UID:course-{c.id}@seu-scheduler",
+            f"SUMMARY:{esc(c.title)} ({esc(c.mode)})",
+            f"DTSTART;TZID={tzid}:{today}{c.start.replace(':','')}00",
+            f"DTEND;TZID={tzid}:{today}{c.end.replace(':','')}00",
+            f"RRULE:FREQ=WEEKLY;BYDAY={byday}",
+            "END:VEVENT"
+        ]
+    # exams with alarm
+    for e in Exam.query.filter_by(user_id=user.id):
+        start = f"{e.date.replace('-','')}T{(e.start or '09:00').replace(':','')}00"
+        end   = f"{e.date.replace('-','')}T{(e.end or '10:00').replace(':','')}00"
+        lines += [
+            "BEGIN:VEVENT",
+            f"UID:exam-{e.id}@seu-scheduler",
+            f"SUMMARY:{esc('اختبار: ' + e.title)}",
+            f"DTSTART;TZID={tzid}:{start}",
+            f"DTEND;TZID={tzid}:{end}",
+            "BEGIN:VALARM","ACTION:DISPLAY","DESCRIPTION:تذكير بالاختبار","TRIGGER:-PT30M","END:VALARM",
+            "END:VEVENT"
+        ]
+    # tasks with custom alarm
+    for t in Task.query.filter_by(user_id=user.id):
+        due_t = (t.due_time or "17:00").replace(":","")
+        start = f"{t.due_date.replace('-','')}T{due_t}00"
+        trig = f"-PT{max(0, t.remind_minutes)}M"
+        lines += [
+            "BEGIN:VEVENT",
+            f"UID:task-{t.id}@seu-scheduler",
+            f"SUMMARY:{esc(f'{t.kind}: {t.title}')}",
+            f"DTSTART;TZID={tzid}:{start}",
+            f"DTEND;TZID={tzid}:{start}",
+            "BEGIN:VALARM","ACTION:DISPLAY","DESCRIPTION:تذكير بالمهمة",f"TRIGGER:{trig}","END:VALARM",
+            "END:VEVENT"
+        ]
+    lines += ["END:VCALENDAR"]
+    ics = "\r\n".join(lines) + "\r\n"
+    return (ics, 200, {"Content-Type":"text/calendar; charset=utf-8","Content-Disposition":"attachment; filename=seu-schedule.ics"})
+
+
+@app.get("/tasks")
+@login_required
+def tasks_page():
+    user = current_user()
+    tasks = Task.query.filter_by(user_id=user.id).order_by(Task.due_date.asc()).all()
+    courses = Course.query.filter_by(user_id=user.id).all()
+    return render_template("tasks.html", tasks=tasks, courses=courses)
+
+@app.post("/tasks")
+@login_required
+def tasks_create():
+    user = current_user()
+    data = request.form
+    course_id = int(data.get("course_id")) if data.get("course_id") else None
+    t = Task(user_id=user.id,
+             course_id=course_id,
+             title=data.get("title","").strip(),
+             kind=data.get("kind","واجب"),
+             due_date=data.get("due_date"),
+             due_time=(data.get("due_time") or None),
+             remind_minutes=int(data.get("remind_minutes") or 30),
+             notes=data.get("notes","").strip())
+    db.session.add(t); db.session.commit()
+    flash("تمت إضافة المهمة.", "success")
+    return redirect(url_for("tasks_page"))
+
+@app.post("/tasks/<int:tid>/delete")
+@login_required
+def tasks_delete(tid):
+    user = current_user()
+    t = Task.query.filter_by(id=tid, user_id=user.id).first_or_404()
+    db.session.delete(t); db.session.commit()
+    flash("تم حذف المهمة.", "info")
+    return redirect(url_for("tasks_page"))
