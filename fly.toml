@@ -14,20 +14,27 @@ app = "seu-scheduler"
   destination = "/data"
 
 [[services]]
-  internal_port = 8080
-  processes = ["app"]
-  protocol = "tcp"
-
-  [[services.ports]]
-    handlers = ["http"]
-    port = 80
-
-  [[services.ports]]
-    handlers = ["tls", "http"]
-    port = 443
-
-  [services.checks]
-    [services.checks.http_check]
-      path = "/healthz"
-      interval = "10s"
-      timeout = "2s"
+internal_port = 8080
+protocol = "tcp"
+[[services.ports]]
+port = 80
+[[services.ports]]
+port = 443
+[services.concurrency]
+type = "connections"
+soft_limit = 25
+hard_limit = 50
+[[services.http_checks]]
+interval = "15s"
+timeout = "2s"
+grace_period = "10s"
+method = "GET"
+path = "/"
+protocol = "http"
+[mounts]
+source = "data"
+destination = "/data"
+[[vm]]
+memory = "512mb"
+cpu_kind = "shared"
+cpus = 1
