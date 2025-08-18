@@ -1,11 +1,11 @@
-from flask import request
-import os
-from datetime import timedelta
 from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
 from functools import wraps
+from datetime import timedelta
+import os
 
+# ---- App & Config ----
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 DB_PATH = os.environ.get("DB_PATH", os.path.join(BASE_DIR, "app.db"))
 
@@ -13,9 +13,10 @@ app = Flask(__name__, static_folder="static", template_folder="templates")
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "change-me-in-prod")
 app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(days=7)
 
-# ---- Jinja time filter (24h -> 12h ص/م) ----
+# Jinja: 24h -> 12h (ص/م)
 def _to12(time_str):
-    if not time_str: return ""
+    if not time_str:
+        return ""
     try:
         h, m = map(int, str(time_str).split(":"))
     except Exception:
@@ -23,9 +24,10 @@ def _to12(time_str):
     suffix = "م" if h >= 12 else "ص"
     h12 = ((h + 11) % 12) + 1
     return f"{h12}:{m:02d} {suffix}"
+
 app.jinja_env.filters["t12"] = _to12
 
-# ---- Database config ----
+# Database config
 DATABASE_URL = os.environ.get("DATABASE_URL", "")
 if DATABASE_URL:
     if DATABASE_URL.startswith("postgres://"):
@@ -36,6 +38,7 @@ else:
 
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {"pool_pre_ping": True, "pool_size": 5, "max_overflow": 10}
+
 db = SQLAlchemy(app)
 
 # ---- Models ----
@@ -45,13 +48,14 @@ class User(db.Model):
     email = db.Column(db.String(120), unique=True, nullable=False)
     password_hash = db.Column(db.String(255), nullable=False)
     is_admin = db.Column(db.Boolean, default=False, nullable=False)
+
 class Course(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     title = db.Column(db.String(200), nullable=False)
-    day = db.Column(db.String(20), nullable=False)  # الأحد..السبت
-    start = db.Column(db.String(5), nullable=False) # "16:00"
-    end = db.Column(db.String(5), nullable=False)   # "16:50"
+    day = db.Column(db.String(20), nullable=False)   # الأحد..السبت
+    start = db.Column(db.String(5), nullable=False)  # "16:00"
+    end = db.Column(db.String(5), nullable=False)    # "16:50"
     mode = db.Column(db.String(20), default="حضوري")  # حضوري / عن بعد
 
 class Exam(db.Model):
@@ -63,7 +67,7 @@ class Exam(db.Model):
     start = db.Column(db.String(5), nullable=False)
     end = db.Column(db.String(5), nullable=False)
 
-# ---- Helpers ----
+# ---- Auth helpers ----
 def login_required(f):
     @wraps(f)
     def wrapper(*args, **kwargs):
@@ -76,9 +80,6 @@ def current_user():
     uid = session.get("user_id")
     return User.query.get(uid) if uid else None
 
-
-
-# --- Admin helper/decorators ---
 def admin_required(f):
     @wraps(f)
     def wrapper(*args, **kwargs):
@@ -93,9 +94,11 @@ def admin_required(f):
 def inject_user():
     u = current_user()
     return {'auth_user': u, 'is_admin': (u.is_admin if u else False)}
-# ---- Routes ----
+
+# ---- Basic Routes ----
 @app.get("/healthz")
-def healthz(): return "ok", 200
+def healthz():
+    return "ok", 200
 
 @app.route("/")
 def index():
@@ -116,7 +119,9 @@ def register():
             flash("البريد مستخدم مسبقًا", "danger")
             return redirect(url_for("register"))
         first = (User.query.count() == 0)
-        user = User(name=name, email=email, password_hash=generate_password_hash(password), is_admin=first)
+        user = User(name=name, email=email,
+                    password_hash=generate_password_hash(password),
+                    is_admin=first)
         db.session.add(user); db.session.commit()
         if first:
             flash('تم إنشاء حسابك كمشرف (أول مستخدم).', 'info')
@@ -152,12 +157,17 @@ def dashboard():
     exams = Exam.query.filter_by(user_id=user.id).all()
     return render_template("dashboard.html", user=user, courses=courses, exams=exams)
 
+# ---- CRUD: Courses & Exams ----
 @app.route("/course", methods=["POST"])
 @login_required
 def add_course():
     user = current_user(); data = request.form
-    c = Course(user_id=user.id, title=data.get("title","").strip(), day=data.get("day"),
-               start=data.get("start"), end=data.get("end"), mode=data.get("mode","حضوري"))
+    c = Course(user_id=user.id,
+               title=data.get("title","").strip(),
+               day=data.get("day"),
+               start=data.get("start"),
+               end=data.get("end"),
+               mode=data.get("mode","حضوري"))
     db.session.add(c); db.session.commit()
     flash("تمت إضافة المحاضرة.", "success")
     return redirect(url_for("dashboard"))
@@ -175,8 +185,12 @@ def delete_course(cid):
 @login_required
 def add_exam():
     user = current_user(); data = request.form
-    e = Exam(user_id=user.id, title=data.get("title","").strip(), kind=data.get("kind"),
-             date=data.get("date"), start=data.get("start"), end=data.get("end"))
+    e = Exam(user_id=user.id,
+             title=data.get("title","").strip(),
+             kind=data.get("kind"),
+             date=data.get("date"),
+             start=data.get("start"),
+             end=data.get("end"))
     db.session.add(e); db.session.commit()
     flash("تمت إضافة الاختبار.", "success")
     return redirect(url_for("dashboard"))
@@ -190,7 +204,8 @@ def delete_exam(eid):
     flash("تم حذف الاختبار.", "info")
     return redirect(url_for("dashboard"))
 
-@app.route("/api/my-schedule")
+# ---- API ----
+@app.get("/api/my-schedule")
 @login_required
 def api_schedule():
     user = current_user()
@@ -200,31 +215,24 @@ def api_schedule():
              for e in Exam.query.filter_by(user_id=user.id)]
     return jsonify({"courses": courses, "exams": exams})
 
-@app.cli.command("init-db")
-def init_db():
-    db.create_all(); print("Database initialized.")
-
-
 # ---- Admin Panel ----
 @app.route("/admin")
 @login_required
 @admin_required
 def admin_dashboard():
     users = User.query.order_by(User.id.asc()).all()
-    try:
-    from models import Course  # noqa
-except Exception:
-    Course = None
     user_count = User.query.count()
     admin_count = User.query.filter_by(is_admin=True).count()
-    course_count = Course.query.count() if 'Course' in globals() else 0
-    exam_count = Exam.query.count() if 'Exam' in globals() else 0
-    return render_template("admin.html",
-                           users=users,
-                           user_count=user_count,
-                           admin_count=admin_count,
-                           course_count=course_count,
-                           exam_count=exam_count)
+    course_count = Course.query.count()
+    exam_count = Exam.query.count()
+    return render_template(
+        "admin.html",
+        users=users,
+        user_count=user_count,
+        admin_count=admin_count,
+        course_count=course_count,
+        exam_count=exam_count
+    )
 
 @app.post("/admin/user/<int:uid>/make-admin")
 @login_required
@@ -278,11 +286,7 @@ def clear_all_data():
     flash("تم مسح كل المحاضرات والاختبارات.", "warning")
     return redirect(url_for('admin_dashboard'))
 
-
-
-# ===== Admin bootstrap (protected) =====
-
-# ===== Admin bootstrap (protected, no circular imports) =====
+# ---- Admin bootstrap (protected, one-time) ----
 @app.get("/make_admin")
 def make_admin_bootstrap():
     token_param = request.args.get("token", "")
@@ -293,65 +297,21 @@ def make_admin_bootstrap():
     target_email = "metuo@msn.com"
     target_name = "Metuo"
 
-    # Use globals if available
-    globals_map = globals()
-    db = globals_map.get("db")
-    User = globals_map.get("User")
-
-    if User is None or db is None:
-        return "Server not ready: User/DB not found", 500
-
-    u = User.query.filter_by(email=target_email.lower()).first()
-    if u:
-        # prefer is_admin flag if exists, else role column
-        if hasattr(u, "is_admin"):
-            u.is_admin = True
-        elif hasattr(u, "role"):
-            u.role = "admin"
-    else:
-        default_password = os.environ.get("ADMIN_BOOTSTRAP_PASSWORD", "ChangeMe#123")
-        # handle different model field names
-        kwargs = {}
-        for k in ("username","name","full_name","display_name"):
-            if hasattr(User, k):
-                kwargs[k] = target_name
-                break
-        if hasattr(User, "email"):
-            kwargs["email"] = target_email.lower()
-        # password hashing: prefer generate_password_hash if model uses password_hash
-        new_user = User(**kwargs)
-        if hasattr(new_user, "password_hash"):
-            new_user.password_hash = generate_password_hash(default_password)
-        elif hasattr(new_user, "set_password"):
-            new_user.set_password(default_password)
-        if hasattr(new_user, "is_admin"):
-            new_user.is_admin = True
-        elif hasattr(new_user, "role"):
-            new_user.role = "admin"
-        db.session.add(new_user)
-        u = new_user
-
-    db.session.commit()
-    return "✅ تم تعيين metuo@msn.com كأدمن. تذكر حذف هذا المسار أو تعطيله.", 200
-
-    target_email = "metuo@msn.com"
-    target_name = "Metuo"
     u = User.query.filter_by(email=target_email.lower()).first()
     if u:
         u.is_admin = True
     else:
-        # NOTE: غيّر كلمة المرور بعد أول دخول
         default_password = os.environ.get("ADMIN_BOOTSTRAP_PASSWORD", "ChangeMe#123")
-        u = User(name=target_name, email=target_email.lower(),
+        u = User(name=target_name,
+                 email=target_email.lower(),
                  password_hash=generate_password_hash(default_password),
                  is_admin=True)
         db.session.add(u)
     db.session.commit()
     return "✅ تم تعيين metuo@msn.com كأدمن. تذكر حذف هذا المسار أو تعطيله.", 200
 
-
+# ---- Main ----
 if __name__ == "__main__":
-    with app.app_context(): db.create_all()
+    with app.app_context():
+        db.create_all()
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 8080)))
-
-CMD ["gunicorn","-w","2","-k","gthread","--threads","2","-b","0.0.0.0:8080","--log-level","debug","wsgi:app"]
