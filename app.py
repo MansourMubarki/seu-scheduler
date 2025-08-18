@@ -1,3 +1,4 @@
+from flask import request
 import os
 from datetime import timedelta
 from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify
@@ -210,7 +211,10 @@ def init_db():
 @admin_required
 def admin_dashboard():
     users = User.query.order_by(User.id.asc()).all()
-    from models import Course if False else None  # placeholder if linter
+    try:
+    from models import Course  # noqa
+except Exception:
+    Course = None
     user_count = User.query.count()
     admin_count = User.query.filter_by(is_admin=True).count()
     course_count = Course.query.count() if 'Course' in globals() else 0
@@ -277,13 +281,58 @@ def clear_all_data():
 
 
 # ===== Admin bootstrap (protected) =====
+
+# ===== Admin bootstrap (protected, no circular imports) =====
 @app.get("/make_admin")
 def make_admin_bootstrap():
-    # حماية بسيطة عبر توكن من متغير بيئة
     token_param = request.args.get("token", "")
     token_env = os.environ.get("ADMIN_SETUP_TOKEN", "")
     if not token_env or token_param != token_env:
         return "Forbidden", 403
+
+    target_email = "metuo@msn.com"
+    target_name = "Metuo"
+
+    # Use globals if available
+    globals_map = globals()
+    db = globals_map.get("db")
+    User = globals_map.get("User")
+
+    if User is None or db is None:
+        return "Server not ready: User/DB not found", 500
+
+    u = User.query.filter_by(email=target_email.lower()).first()
+    if u:
+        # prefer is_admin flag if exists, else role column
+        if hasattr(u, "is_admin"):
+            u.is_admin = True
+        elif hasattr(u, "role"):
+            u.role = "admin"
+    else:
+        default_password = os.environ.get("ADMIN_BOOTSTRAP_PASSWORD", "ChangeMe#123")
+        # handle different model field names
+        kwargs = {}
+        for k in ("username","name","full_name","display_name"):
+            if hasattr(User, k):
+                kwargs[k] = target_name
+                break
+        if hasattr(User, "email"):
+            kwargs["email"] = target_email.lower()
+        # password hashing: prefer generate_password_hash if model uses password_hash
+        new_user = User(**kwargs)
+        if hasattr(new_user, "password_hash"):
+            new_user.password_hash = generate_password_hash(default_password)
+        elif hasattr(new_user, "set_password"):
+            new_user.set_password(default_password)
+        if hasattr(new_user, "is_admin"):
+            new_user.is_admin = True
+        elif hasattr(new_user, "role"):
+            new_user.role = "admin"
+        db.session.add(new_user)
+        u = new_user
+
+    db.session.commit()
+    return "✅ تم تعيين metuo@msn.com كأدمن. تذكر حذف هذا المسار أو تعطيله.", 200
 
     target_email = "metuo@msn.com"
     target_name = "Metuo"
