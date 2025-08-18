@@ -353,3 +353,5 @@ def make_admin_bootstrap():
 if __name__ == "__main__":
     with app.app_context(): db.create_all()
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 8080)))
+
+CMD ["gunicorn","-w","2","-k","gthread","--threads","2","-b","0.0.0.0:8080","--log-level","debug","wsgi:app"]
