@@ -1,12 +1,13 @@
 app = "seu-scheduler"
 primary_region = "fra"
 
-[build]
-  dockerfile = "Dockerfile"
-
 [env]
   PORT = "8080"
   DB_PATH = "/data/app.db"
+
+[[mounts]]
+  source = "data"        # اسم الـ volume (وليس الـ ID)
+  destination = "/data"
 
 [http_service]
   internal_port = 8080
@@ -15,6 +16,3 @@ primary_region = "fra"
   auto_stop_machines = "stop"
   min_machines_running = 1
   processes = ["app"]
-
-\1data\2
-  destination = "/data"
