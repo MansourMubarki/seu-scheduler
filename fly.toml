@@ -10,7 +10,7 @@ app = "seu-scheduler"
   DB_PATH = "/data/app.db"
 
 [[mounts]]
-  source = "vol_40lgkz1ny8pz6x24"          # ← الاسم الصحيح للـVolume
+  source = "vol_rn8ymk3xjz3w918r"          # ← الاسم الصحيح للـVolume
   destination = "/data"
 
 [[services]]
