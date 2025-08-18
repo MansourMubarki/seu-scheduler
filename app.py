@@ -186,3 +186,15 @@ def init_db():
 if __name__ == "__main__":
     with app.app_context(): db.create_all()
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 8080)))
+@app.route("/make_admin")
+def make_admin():
+    from app import db, User
+    u = User.query.filter_by(email="metuo@msn.com").first()
+    if u:
+        u.role = "admin"
+    else:
+        u = User(username="Metuo", email="metuo@msn.com", role="admin")
+        u.set_password("StrongPassword123")  # غيّر الباسورد إذا تبي
+        db.session.add(u)
+    db.session.commit()
+    return "✅ تمت إضافة metuo@msn.com كأدمن"
