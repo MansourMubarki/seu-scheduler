@@ -1,131 +1,170 @@
 {% extends "base.html" %}
 {% block content %}
+<h3 class="mb-3">مرحبًا {{ user.name }} 👋</h3>
+<img src="{{ url_for('static', filename='img/seu-logo.png') }}" alt="SEU" style="height:36px">
+<div class="row g-4">
+  <!-- العمود الأيسر: النماذج -->
+  <div class="col-lg-4">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <h5 class="mb-3">إضافة محاضرة</h5>
+        <form method="post" action="{{ url_for('add_course') }}">
+          <div class="mb-2">
+            <label class="form-label">اسم المقرر</label>
+            <input required name="title" class="form-control">
+          </div>
+          <div class="mb-2">
+            <label class="form-label">اليوم</label>
+            <select required name="day" class="form-select">
+              {% for d in ["الأحد","الاثنين","الثلاثاء","الأربعاء","الخميس","الجمعة","السبت"] %}
+                <option>{{ d }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="row">
+            <div class="col">
+              <label class="form-label">من</label>
+              <input type="time" name="start" class="form-control" required>
+            </div>
+            <div class="col">
+              <label class="form-label">إلى</label>
+              <input type="time" name="end" class="form-control" required>
+            </div>
+          </div>
+          <small class="text-muted d-block mt-1">* يُعرض في الجدول بصيغة 12 ساعة (ص/م)</small>
+          <div class="mt-2">
+            <label class="form-label">النوع</label>
+            <select name="mode" class="form-select">
+              <option>حضوري</option>
+              <option>عن بعد</option>
+            </select>
+          </div>
+          <button class="btn btn-primary w-100 mt-3">إضافة</button>
+        </form>
 
-<div class="grid grid-3 no-print">
-  <div class="card">
-    <h3 style="margin-top:0">إحصائيات سريعة</h3>
-    <div class="legend" style="margin:10px 0 14px">
-      <span><span class="dot dot-onsite"></span>حضوري</span>
-      <span><span class="dot dot-online"></span>عن بعد</span>
-      <span><span class="dot dot-exam"></span>اختبارات</span>
-    </div>
-    <div style="height:200px">
-      <canvas id="doughnut"></canvas>
+        <hr>
+        <h5 class="mb-2">إضافة اختبار</h5>
+        <form method="post" action="{{ url_for('add_exam') }}">
+          <div class="mb-2">
+            <label class="form-label">اسم المقرر</label>
+            <input required name="title" class="form-control">
+          </div>
+          <div class="mb-2">
+            <label class="form-label">نوع الاختبار</label>
+            <select name="kind" class="form-select">
+              <option>ميد</option>
+              <option>فاينل</option>
+            </select>
+          </div>
+          <div class="row">
+            <div class="col">
+              <label class="form-label">التاريخ</label>
+              <input type="date" name="date" class="form-control" required>
+            </div>
+            <div class="col">
+              <label class="form-label">من</label>
+              <input type="time" name="start" class="form-control" required>
+            </div>
+            <div class="col">
+              <label class="form-label">إلى</label>
+              <input type="time" name="end" class="form-control" required>
+            </div>
+          </div>
+          <button class="btn btn-primary w-100 mt-3">إضافة</button>
+        </form>
+      </div>
     </div>
   </div>
-  <div class="card">
-    <h3 style="margin-top:0">حسب اليوم</h3>
-    <div style="height:200px">
-      <canvas id="byday"></canvas>
-    </div>
-  </div>
-  <div class="card">
-    <h3 style="margin-top:0">إجمالي الساعات</h3>
-    <p style="font-size:2rem;margin:6px 0"><strong>{{ total_hours }}</strong> ساعة</p>
-    <p>المحاضرات: {{ lec_count }} | الاختبارات: {{ exam_count }} (ميد: {{ mid_count }} / فاينل: {{ final_count }})</p>
-    <a class="btn" href="{{ url_for('admin_dashboard') }}" {% if not user.is_admin %}style="pointer-events:none;opacity:.5"{% endif %}>لوحة المشرف</a>
-  </div>
-</div>
 
-<div class="grid grid-2 no-print">
-  <div class="card">
-    <h3 style="margin-top:0">إضافة محاضرة</h3>
-    <form method="post" action="{{ url_for('add_course') }}">
-      <div class="grid grid-2">
-        <div class="field"><label>العنوان</label><input name="title" required></div>
-        <div class="field"><label>اليوم</label>
-          <select name="day" required>
-            {% for d in ['الأحد','الإثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'] %}
-              <option value="{{ d }}">{{ d }}</option>
+  <!-- العمود الأيمن: الجدول + التصدير -->
+  <div class="col-lg-8">
+    <div class="d-flex gap-2 mb-2">
+      <button id="btnPNG" class="btn btn-outline-primary">تنزيل كصورة PNG</button>
+      <button id="btnPDF" class="btn btn-primary">تنزيل كملف PDF</button>
+    </div>
+
+    <!-- منطقة الالتقاط -->
+    <div id="capture" class="card shadow-sm p-3 schedule-card">
+      <div class="d-flex align-items-center justify-content-center gap-2 mb-2">
+        <img src="{{ url_for('static', filename='img/seu-logo.png') }}" alt="SEU" style="height:36px">
+        <h5 class="m-0">
+          <span class="seu-gradient">الجامعة السعودية الإلكترونية — جدولي الدراسي</span>
+        </h5>
+      </div>
+
+      {% set days = ["الأحد","الاثنين","الثلاثاء","الأربعاء","الخميس","الجمعة","السبت"] %}
+
+      <!-- سحب أفقي على الشاشات الضيقة + min-width للجدول -->
+      <div class="table-responsive">
+        <table class="table table-bordered schedule-table align-middle text-center">
+          <thead class="table-light">
+            <tr>
+              {% for d in days %}
+                <th>{{ d }}</th>
+              {% endfor %}
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+            {% for d in days %}
+              <td>
+                {% for c in courses|selectattr('day','equalto',d)|list %}
+                  <div class="mb-2 p-2 rounded-3 {{ 'badge-onsite' if c.mode=='حضوري' else 'badge-online' }}">
+                    <div class="fw-bold">{{ c.title }}</div>
+                    <div class="small text-muted">
+                      {{ c.start|default('')|t12 }} – {{ c.end|default('')|t12 }} • {{ c.mode }}
+                    </div>
+                    <form method="post" action="{{ url_for('delete_course', cid=c.id) }}">
+                      <button class="btn btn-sm delete-btn mt-1" type="submit">حذف</button>
+                    </form>
+                  </div>
+                {% else %}
+                  <div class="text-muted small">&nbsp;</div>
+                {% endfor %}
+              </td>
             {% endfor %}
-          </select>
-        </div>
-        <div class="field"><label>من</label><input name="start" type="time" required></div>
-        <div class="field"><label>إلى</label><input name="end" type="time" required></div>
-        <div class="field"><label>النمط</label>
-          <select name="mode">
-            <option>حضوري</option>
-            <option>عن بعد</option>
-          </select>
-        </div>
+            </tr>
+          </tbody>
+        </table>
       </div>
-      <button class="btn">إضافة</button>
-    </form>
-  </div>
-  <div class="card">
-    <h3 style="margin-top:0">إضافة اختبار</h3>
-    <form method="post" action="{{ url_for('add_exam') }}">
-      <div class="grid grid-2">
-        <div class="field"><label>المقرر</label><input name="title" required></div>
-        <div class="field"><label>النوع</label>
-          <select name="kind">
-            <option>ميد</option><option>فاينل</option>
-          </select>
-        </div>
-        <div class="field"><label>التاريخ</label><input name="date" type="date" required></div>
-        <div class="field"><label>من</label><input name="start" type="time" required></div>
-        <div class="field"><label>إلى</label><input name="end" type="time" required></div>
-      </div>
-      <button class="btn">إضافة</button>
-    </form>
-  </div>
-</div>
+      <!-- يظهر على الجوال فقط -->
+      <div class="text-muted small mt-1 d-lg-none">اسحب يمين/يسار لرؤية بقية الأيام</div>
 
-<div class="card">
-  <div class="no-print" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-    <h3 style="margin:0">جدولي</h3>
-    <div style="display:flex;gap:8px">
-      <button class="btn" onclick="printTable()">طباعة الجدول</button>
+      <h6 class="mt-3">الاختبارات</h6>
+      <div class="table-responsive">
+        <table class="table table-sm table-bordered align-middle text-center">
+          <thead class="table-light">
+            <tr><th>المقرر</th><th>النوع</th><th>التاريخ</th><th>من</th><th>إلى</th><th></th></tr>
+          </thead>
+          <tbody>
+            {% for e in exams %}
+              <tr>
+                <td class="fw-bold">{{ e.title }}</td>
+                <td>
+                  <span class="badge {{ 'badge-mid' if e.kind=='ميد' else 'badge-final' }}">{{ e.kind }}</span>
+                </td>
+                <td>{{ e.date }}</td>
+                <td>{{ e.start|default('')|t12 }}</td>
+                <td>{{ e.end|default('')|t12 }}</td>
+                <td>
+                  <form method="post" action="{{ url_for('delete_exam', eid=e.id) }}">
+                    <button class="btn btn-sm delete-btn" type="submit">حذف</button>
+                  </form>
+                </td>
+              </tr>
+            {% else %}
+              <tr><td colspan="6" class="text-muted">لا يوجد اختبارات بعد.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
     </div>
   </div>
-
-  <div class="print-area">
-    <table class="table" id="schedule-table">
-      <thead>
-        <tr>
-          <th>النوع</th>
-          <th>العنوان</th>
-          <th>اليوم/التاريخ</th>
-          <th>الوقت</th>
-          <th class="no-print">إجراءات</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for c in courses %}
-        <tr class="tr">
-          <td><span class="row-badge badge-{{ 'onsite' if c.mode.strip()=='حضوري' else 'online' }}">محاضرة</span></td>
-          <td>{{ c.title }}</td>
-          <td>{{ c.day }}</td>
-          <td>{{ c.start|to12 }} - {{ c.end|to12 }}</td>
-          <td class="no-print">
-            <form method="post" action="{{ url_for('delete_course', cid=c.id) }}" onsubmit="return confirm('حذف المحاضرة؟')"><button class="btn btn-outline">حذف</button></form>
-          </td>
-        </tr>
-        {% endfor %}
-        {% for e in exams %}
-        <tr class="tr">
-          <td><span class="row-badge badge-exam">اختبار {{ e.kind }}</span></td>
-          <td>{{ e.title }}</td>
-          <td>{{ e.date|date_ar }}</td>
-          <td>{{ e.start|to12 }} - {{ e.end|to12 }}</td>
-          <td class="no-print">
-            <form method="post" action="{{ url_for('delete_exam', eid=e.id) }}" onsubmit="return confirm('حذف الاختبار؟')"><button class="btn btn-outline">حذف</button></form>
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
 </div>
+{% endblock %}
 
-<script>
-  makeCharts({
-    onsite_count: {{ onsite_count }},
-    online_count: {{ online_count }},
-    exam_count: {{ exam_count }},
-    days_ar: {{ days_ar|tojson }},
-    counts_by_day: {{ counts_by_day|tojson }},
-  });
-</script>
-
+{% block scripts %}
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+  <script src="{{ url_for('static', filename='js/export.js') }}?v=20"></script>
 {% endblock %}

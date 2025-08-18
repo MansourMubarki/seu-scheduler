@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block content %}
+<h3 class="mb-3">إدارة المستخدمين</h3>
+<div class="table-responsive">
+  <table class="table table-bordered align-middle">
+    <thead>
+      <tr>
+        <th>#</th><th>الاسم</th><th>البريد</th><th>الدور</th><th>تحديث</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for u in users %}
+      <tr>
+        <td>{{ u.id }}</td>
+        <td>{{ u.name }}</td>
+        <td>{{ u.email }}</td>
+        <td>
+          <form method="post" action="{{ url_for('admin_set_role', uid=u.id) }}" class="d-flex gap-2">
+            <select name="role" class="form-select form-select-sm" style="max-width:160px">
+              <option value="Student" {{ 'selected' if u.role=='Student' else '' }}>Student</option>
+              <option value="Admin" {{ 'selected' if u.role=='Admin' else '' }}>Admin</option>
+            </select>
+            <button class="btn btn-sm btn-primary">حفظ</button>
+          </form>
+        </td>
+        <td>
+          {% if u.role=='Admin' %}<span class="badge text-bg-secondary">مشرف</span>{% else %}<span class="badge text-bg-info">طالب</span>{% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+<a class="btn btn-outline-secondary" href="{{ url_for('admin') }}">رجوع للوحة التحكم</a>
+{% endblock %}

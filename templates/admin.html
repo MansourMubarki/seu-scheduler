@@ -1,31 +1,89 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="card">
-  <h2 style="margin-top:0">لوحة المشرف</h2>
-  <p>المستخدمون: {{ user_count }} | المشرفون: {{ admin_count }} | المحاضرات: {{ course_count }} | الاختبارات: {{ exam_count }}</p>
+<h3 class="mb-3">لوحة التحكم والإحصائيات</h3>
 
-  <table class="table">
-    <thead><tr><th>#</th><th>الاسم</th><th>البريد</th><th>مشرف؟</th><th class="no-print">إجراءات</th></tr></thead>
-    <tbody>
-      {% for u in users %}
-      <tr class="tr">
-        <td>{{ u.id }}</td>
-        <td>{{ u.name }}</td>
-        <td>{{ u.email }}</td>
-        <td>{{ 'نعم' if u.is_admin else 'لا' }}</td>
-        <td class="no-print" style="display:flex;gap:6px">
-          {% if not u.is_admin %}
-            <form method="post" action="{{ url_for('make_admin', uid=u.id) }}"><button class="btn btn-outline">ترقية</button></form>
-          {% else %}
-            <form method="post" action="{{ url_for('remove_admin', uid=u.id) }}"><button class="btn btn-outline">إزالة</button></form>
-          {% endif %}
-          <form method="post" action="{{ url_for('delete_user_admin', uid=u.id) }}" onsubmit="return confirm('حذف المستخدم وبياناته؟')"><button class="btn btn-outline">حذف</button></form>
-        </td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-
-  <form class="no-print" method="post" action="{{ url_for('clear_all_data') }}" onsubmit="return confirm('مسح كل المحاضرات والاختبارات؟')"><button class="btn">مسح كل البيانات</button></form>
+<div class="row g-3 mb-3">
+  <div class="col-6 col-md-3">
+    <div class="card shadow-sm"><div class="card-body">
+      <div class="text-muted small">عدد المقررات</div>
+      <div class="fs-4 fw-bold" id="stat-courses">—</div>
+    </div></div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card shadow-sm"><div class="card-body">
+      <div class="text-muted small">عدد المحاضرات/الأسبوع</div>
+      <div class="fs-4 fw-bold" id="stat-sessions">—</div>
+    </div></div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card shadow-sm"><div class="card-body">
+      <div class="text-muted small">ساعات أسبوعية</div>
+      <div class="fs-4 fw-bold" id="stat-hours">—</div>
+    </div></div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card shadow-sm"><div class="card-body">
+      <div class="text-muted small">اختبارات قادمة (30 يوم)</div>
+      <div class="fs-4 fw-bold" id="stat-upcoming">—</div>
+    </div></div>
+  </div>
 </div>
+
+<div class="row g-3">
+  <div class="col-lg-6">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <h5 class="card-title">توزيع الأنماط: حضوري / عن بعد</h5>
+        <canvas id="chartMode"></canvas>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-6">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <h5 class="card-title">المحاضرات حسب اليوم</h5>
+        <canvas id="chartByDay"></canvas>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-3 mt-3">
+  <div class="col-lg-7">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <h5 class="card-title">إدارة البيانات</h5>
+        <div class="d-flex flex-wrap gap-2">
+          <a class="btn btn-outline-primary btn-sm" href="{{ url_for('export_courses_csv') }}">تصدير المقررات CSV</a>
+          <a class="btn btn-outline-primary btn-sm" href="{{ url_for('export_exams_csv') }}">تصدير الاختبارات CSV</a>
+          <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('export_json') }}">تصدير JSON</a>
+        </div>
+        <hr>
+        <form class="d-flex align-items-center gap-2" method="post" action="{{ url_for('import_data') }}" enctype="multipart/form-data">
+          <label class="form-label m-0">استيراد CSV/JSON:</label>
+          <input class="form-control" type="file" name="file" accept=".csv,.json" required>
+          <button class="btn btn-success">استيراد</button>
+        </form>
+        <div class="form-text mt-2">
+          صيغة CSV للمقررات: <code>title,day,start,end,mode</code> — للاختبارات: <code>title,kind,date,start,end</code>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-5">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <h5 class="card-title">مؤشرات ذكية</h5>
+        <ul class="mb-0 small" id="insights-list">
+          <li>—</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="{{ url_for('static', filename='js/admin.js') }}?v=1"></script>
 {% endblock %}

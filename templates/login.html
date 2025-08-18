@@ -1,22 +1,23 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="grid grid-2">
-  <div class="card">
-    <h2>تسجيل الدخول</h2>
-    <form method="post">
-      <div class="field">
-        <label>البريد الإلكتروني</label>
-        <input name="email" type="email" required>
+<div class="row justify-content-center">
+  <div class="col-md-6 col-lg-5">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <h4 class="mb-3">تسجيل الدخول</h4>
+        <form method="post" action="{{ url_for('login') }}">
+          <div class="mb-3">
+            <label class="form-label">البريد الإلكتروني</label>
+            <input type="email" name="email" class="form-control" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">كلمة المرور</label>
+            <input type="password" name="password" class="form-control" required>
+          </div>
+          <button class="btn btn-primary w-100">دخول</button>
+        </form>
       </div>
-      <div class="field">
-        <label>كلمة المرور</label>
-        <input name="password" type="password" required>
-      </div>
-      <button class="btn">دخول</button>
-    </form>
-  </div>
-  <div class="card">
-    ليس لديك حساب؟ <a href="{{ url_for('register') }}">سجّل الآن</a>
+    </div>
   </div>
 </div>
 {% endblock %}

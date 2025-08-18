@@ -1,27 +1,33 @@
-# Fly.io configuration
+# fly.toml — SEU Scheduler (Flask + SQLite)
+
 app = "seu-scheduler"
-primary_region = "fra"
 
 [build]
   dockerfile = "Dockerfile"
 
 [env]
   PORT = "8080"
-
-[http_service]
-  internal_port = 8080
-  force_https = true
-  auto_start_machines = true
-  auto_stop_machines = "off"
-  min_machines_running = 1
-
-  [[http_service.checks]]
-    grace_period = "10s"
-    interval = "15s"
-    method = "GET"
-    path = "/health"
-    timeout = "2s"
+  DB_PATH = "/data/app.db"
 
 [[mounts]]
-  source = "data"
+  source = "vol_40lgkz1ny8pz6x24"          # ← الاسم الصحيح للـVolume
   destination = "/data"
+
+[[services]]
+  internal_port = 8080
+  processes = ["app"]
+  protocol = "tcp"
+
+  [[services.ports]]
+    handlers = ["http"]
+    port = 80
+
+  [[services.ports]]
+    handlers = ["tls", "http"]
+    port = 443
+
+  [services.checks]
+    [services.checks.http_check]
+      path = "/healthz"
+      interval = "10s"
+      timeout = "2s"
