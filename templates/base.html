@@ -23,7 +23,6 @@
         </a>
         <div class="d-flex align-items-center gap-3">
           {% if session.get('user_id') %}
-            {% if session.get('role') == 'Admin' %}<a class="btn btn-outline-secondary btn-sm" href="{{ url_for('admin') }}">لوحة التحكم</a>{% endif %}
             <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('logout') }}">تسجيل الخروج</a>
           {% else %}
             <a class="btn btn-outline-primary btn-sm" href="{{ url_for('login') }}">تسجيل الدخول</a>

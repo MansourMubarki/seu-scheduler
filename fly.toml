@@ -1,5 +1,3 @@
-# fly.toml — SEU Scheduler (Flask + SQLite)
-
 app = "seu-scheduler"
 
 [build]
@@ -9,32 +7,17 @@ app = "seu-scheduler"
   PORT = "8080"
   DB_PATH = "/data/app.db"
 
-[[mounts]]
-  source = "vol_rn8ymk3xjz3w918r"          # ← الاسم الصحيح للـVolume
-  destination = "/data"
-
 [[services]]
-internal_port = 8080
-protocol = "tcp"
-[[services.ports]]
-port = 80
-[[services.ports]]
-port = 443
-[services.concurrency]
-type = "connections"
-soft_limit = 25
-hard_limit = 50
-[[services.http_checks]]
-interval = "15s"
-timeout = "2s"
-grace_period = "10s"
-method = "GET"
-path = "/"
-protocol = "http"
+  internal_port = 8080
+  processes = ["app"]
+  protocol = "tcp"
+  [[services.ports]]
+    handlers = ["http"]
+    port = 80
+  [[services.ports]]
+    handlers = ["tls", "http"]
+    port = 443
+
 [mounts]
-source = "data"
-destination = "/data"
-[[vm]]
-memory = "512mb"
-cpu_kind = "shared"
-cpus = 1
+  source = "data"
+  destination = "/data"
