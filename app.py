@@ -274,6 +274,33 @@ def clear_all_data():
     flash("تم مسح كل المحاضرات والاختبارات.", "warning")
     return redirect(url_for('admin_dashboard'))
 
+
+
+# ===== Admin bootstrap (protected) =====
+@app.get("/make_admin")
+def make_admin_bootstrap():
+    # حماية بسيطة عبر توكن من متغير بيئة
+    token_param = request.args.get("token", "")
+    token_env = os.environ.get("ADMIN_SETUP_TOKEN", "")
+    if not token_env or token_param != token_env:
+        return "Forbidden", 403
+
+    target_email = "metuo@msn.com"
+    target_name = "Metuo"
+    u = User.query.filter_by(email=target_email.lower()).first()
+    if u:
+        u.is_admin = True
+    else:
+        # NOTE: غيّر كلمة المرور بعد أول دخول
+        default_password = os.environ.get("ADMIN_BOOTSTRAP_PASSWORD", "ChangeMe#123")
+        u = User(name=target_name, email=target_email.lower(),
+                 password_hash=generate_password_hash(default_password),
+                 is_admin=True)
+        db.session.add(u)
+    db.session.commit()
+    return "✅ تم تعيين metuo@msn.com كأدمن. تذكر حذف هذا المسار أو تعطيله.", 200
+
+
 if __name__ == "__main__":
     with app.app_context(): db.create_all()
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 8080)))
